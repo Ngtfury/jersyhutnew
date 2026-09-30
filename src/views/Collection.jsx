@@ -30,9 +30,10 @@ export default function Collection({ categorySlug }) {
           description: "Long sleeve football kits crafted for supreme seasonal comfort and sleek terrace aesthetics."
         };
       case 'oversized':
+      case 'oversized-t':
         return {
-          title: "OVERSIZED",
-          categoryName: "OVERSIZED",
+          title: "OVERSIZED T",
+          categoryName: "OVERSIZED T",
           description: "Contemporary boxy streetwear cuts with heavyweight fabric and dropped shoulder tailoring."
         };
       case 'tshirts':
@@ -42,20 +43,32 @@ export default function Collection({ categorySlug }) {
           description: "Minimalist football graphic tees and lightweight warmup shirts."
         };
       case 'half-sleeves':
-      default:
         return {
           title: "HALF SLEEVES",
           categoryName: "HALF SLEEVES",
           description: "Classic matchday half sleeve jerseys celebrating the greatest clubs, players, and tournaments."
         };
+      default: {
+        const formatted = categorySlug ? categorySlug.replace(/-/g, ' ').toUpperCase() : 'JERSEYS';
+        return {
+          title: formatted,
+          categoryName: formatted,
+          description: `Curated ${formatted} edition kits from Jersey Hut.`
+        };
+      }
     }
   }, [categorySlug]);
 
   // Filter products by category
   const filteredProducts = useMemo(() => {
-    let list = allProducts.filter(p => p.category === collectionInfo.categoryName);
+    let list = allProducts.filter(p => {
+      if (collectionInfo.categoryName === 'OVERSIZED T') {
+        return p.category === 'OVERSIZED T' || p.category === 'OVERSIZED';
+      }
+      return p.category === collectionInfo.categoryName || 
+             p.category?.toLowerCase() === collectionInfo.categoryName?.toLowerCase();
+    });
 
-    // If a category has fewer than 2 items, supplement with related items so the grid looks full and lavish
     if (list.length === 0) {
       list = allProducts.filter(p => p.secondaryCategory === collectionInfo.categoryName);
     }

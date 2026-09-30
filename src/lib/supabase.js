@@ -11,10 +11,48 @@ export const supabase = isSupabaseConfigured
   : null;
 
 /**
+ * DEFAULT MAIN CATEGORIES
+ */
+export const DEFAULT_CATEGORIES = [
+  { id: 'cat-full-sleeves', name: 'FULL SLEEVES', slug: 'full-sleeves', description: 'Long sleeve tactical & lifestyle football kits.' },
+  { id: 'cat-half-sleeves', name: 'HALF SLEEVES', slug: 'half-sleeves', description: 'Classic matchday & heritage half sleeve shirts.' },
+  { id: 'cat-oversized-t', name: 'OVERSIZED T', slug: 'oversized-t', description: 'Heavyweight boxy streetwear football jerseys.' },
+  { id: 'cat-tshirts', name: 'TSHIRTS', slug: 'tshirts', description: 'Minimal football warmup & graphic lifestyle tees.' },
+];
+
+/**
+ * DEFAULT VENDORS (Fallback starter data)
+ */
+export const DEFAULT_VENDORS = [
+  {
+    id: 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d',
+    name: 'Apex Jersey Manufacturers',
+    contact_person: 'Rahul Verma',
+    phone: '+91 98765 43210',
+    email: 'sales@apexjerseys.in',
+    notes: 'Primary domestic supplier for sublimation & dotknit matchday shirts.'
+  }
+];
+
+/**
  * Normalizes product data from Supabase snake_case to frontend camelCase
  */
 export function normalizeProduct(row) {
   if (!row) return null;
+  
+  // Extract primary & secondary colors cleanly
+  let primary = row.primary_color || '';
+  let secondary = row.secondary_color || '';
+  if (!primary && row.color) {
+    if (row.color.includes('/')) {
+      const parts = row.color.split('/');
+      primary = parts[0]?.trim() || '';
+      secondary = parts[1]?.trim() || '';
+    } else if (row.color !== '-- No Color --') {
+      primary = row.color;
+    }
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -23,7 +61,9 @@ export function normalizeProduct(row) {
     category: row.category,
     secondaryCategory: row.secondary_category || row.secondaryCategory,
     badge: row.badge,
-    color: row.color,
+    color: row.color || [primary, secondary].filter(Boolean).join(' / '),
+    primaryColor: primary,
+    secondaryColor: secondary,
     sizes: row.sizes || ['S', 'M', 'L', 'XL', '2XL'],
     stock_per_size: row.stock_per_size || { S: 5, M: 5, L: 5, XL: 5, '2XL': 5 },
     images: Array.isArray(row.images) && row.images.length > 0
@@ -37,6 +77,10 @@ export function normalizeProduct(row) {
     isBestSeller: Boolean(row.is_best_seller ?? row.isBestSeller),
     featured: Boolean(row.featured),
     description: row.description || '',
+    // Vendor and stock management
+    vendorId: row.vendor_id || '',
+    vendorPrice: row.vendor_price !== null && row.vendor_price !== undefined ? Number(row.vendor_price) : undefined,
+    minStockAlert: row.min_stock_alert !== null && row.min_stock_alert !== undefined ? Number(row.min_stock_alert) : 5,
     created_at: row.created_at,
   };
 }
@@ -106,6 +150,10 @@ export async function createProduct(productData) {
     throw new Error('Supabase is not configured. Please add NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file.');
   }
 
+  const primary = productData.primaryColor || null;
+  const secondary = productData.secondaryColor || null;
+  const combinedColor = [primary, secondary].filter(Boolean).join(' / ') || productData.color || null;
+
   const payload = {
     name: productData.name,
     price: Number(productData.price),
@@ -113,7 +161,9 @@ export async function createProduct(productData) {
     category: productData.category,
     secondary_category: productData.secondaryCategory || null,
     badge: productData.badge || null,
-    color: productData.color || null,
+    color: combinedColor,
+    primary_color: primary,
+    secondary_color: secondary,
     sizes: productData.sizes || ['S', 'M', 'L', 'XL', '2XL'],
     stock_per_size: productData.stock_per_size || {},
     images: productData.images || [],
@@ -125,6 +175,9 @@ export async function createProduct(productData) {
     is_best_seller: Boolean(productData.isBestSeller),
     featured: Boolean(productData.featured),
     description: productData.description || null,
+    vendor_id: productData.vendorId || null,
+    vendor_price: productData.vendorPrice !== undefined && productData.vendorPrice !== '' ? Number(productData.vendorPrice) : null,
+    min_stock_alert: productData.minStockAlert !== undefined && productData.minStockAlert !== '' ? Number(productData.minStockAlert) : 5,
   };
 
   const { data, error } = await supabase
@@ -145,6 +198,10 @@ export async function updateProduct(id, productData) {
     throw new Error('Supabase is not configured. Please add NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file.');
   }
 
+  const primary = productData.primaryColor || null;
+  const secondary = productData.secondaryColor || null;
+  const combinedColor = [primary, secondary].filter(Boolean).join(' / ') || productData.color || null;
+
   const payload = {
     name: productData.name,
     price: Number(productData.price),
@@ -152,7 +209,9 @@ export async function updateProduct(id, productData) {
     category: productData.category,
     secondary_category: productData.secondaryCategory || null,
     badge: productData.badge || null,
-    color: productData.color || null,
+    color: combinedColor,
+    primary_color: primary,
+    secondary_color: secondary,
     sizes: productData.sizes || ['S', 'M', 'L', 'XL', '2XL'],
     stock_per_size: productData.stock_per_size || {},
     images: productData.images || [],
@@ -164,6 +223,9 @@ export async function updateProduct(id, productData) {
     is_best_seller: Boolean(productData.isBestSeller),
     featured: Boolean(productData.featured),
     description: productData.description || null,
+    vendor_id: productData.vendorId || null,
+    vendor_price: productData.vendorPrice !== undefined && productData.vendorPrice !== '' ? Number(productData.vendorPrice) : null,
+    min_stock_alert: productData.minStockAlert !== undefined && productData.minStockAlert !== '' ? Number(productData.minStockAlert) : 5,
     updated_at: new Date().toISOString(),
   };
 
@@ -188,6 +250,224 @@ export async function deleteProduct(id) {
 
   const { error } = await supabase
     .from('products')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * ===================================================================
+ * CATEGORIES MANAGEMENT
+ * ===================================================================
+ */
+export async function getCategories() {
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem('jerseyhut_categories');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+  }
+
+  if (!supabase) return DEFAULT_CATEGORIES;
+
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('jerseyhut_categories', JSON.stringify(data));
+      }
+      return data;
+    }
+  } catch (err) {
+    console.warn('Could not fetch categories from Supabase, using defaults:', err.message);
+  }
+
+  return DEFAULT_CATEGORIES;
+}
+
+export async function createCategory(catData) {
+  const slug = catData.slug || catData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const payload = {
+    name: catData.name.trim().toUpperCase(),
+    slug,
+    description: catData.description || null,
+  };
+
+  if (!supabase) {
+    const mock = { ...payload, id: 'cat-' + Date.now() };
+    if (typeof window !== 'undefined') {
+      const current = await getCategories();
+      const updated = [...current, mock];
+      localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+    }
+    return mock;
+  }
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (typeof window !== 'undefined') {
+    const current = await getCategories();
+    const updated = [...current.filter(c => c.name !== data.name), data];
+    localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+  }
+
+  return data;
+}
+
+export async function deleteCategory(id) {
+  if (typeof window !== 'undefined') {
+    const current = await getCategories();
+    const updated = current.filter(c => c.id !== id);
+    localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+  }
+
+  if (!supabase) return true;
+
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * ===================================================================
+ * VENDORS MANAGEMENT
+ * ===================================================================
+ */
+export async function getVendors() {
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem('jerseyhut_vendors');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+  }
+
+  if (!supabase) return DEFAULT_VENDORS;
+
+  try {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('jerseyhut_vendors', JSON.stringify(data));
+      }
+      return data;
+    }
+  } catch (err) {
+    console.warn('Could not fetch vendors from Supabase, using defaults:', err.message);
+  }
+
+  return DEFAULT_VENDORS;
+}
+
+export async function createVendor(vendorData) {
+  const payload = {
+    name: vendorData.name.trim(),
+    contact_person: vendorData.contact_person || vendorData.contactPerson || null,
+    phone: vendorData.phone || null,
+    email: vendorData.email || null,
+    notes: vendorData.notes || null,
+  };
+
+  if (!supabase) {
+    const mock = { ...payload, id: 'v-' + Date.now(), created_at: new Date().toISOString() };
+    if (typeof window !== 'undefined') {
+      const current = await getVendors();
+      const updated = [...current, mock];
+      localStorage.setItem('jerseyhut_vendors', JSON.stringify(updated));
+    }
+    return mock;
+  }
+
+  const { data, error } = await supabase
+    .from('vendors')
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (typeof window !== 'undefined') {
+    const current = await getVendors();
+    const updated = [...current.filter(v => v.id !== data.id), data];
+    localStorage.setItem('jerseyhut_vendors', JSON.stringify(updated));
+  }
+
+  return data;
+}
+
+export async function updateVendor(id, vendorData) {
+  const payload = {
+    name: vendorData.name.trim(),
+    contact_person: vendorData.contact_person || vendorData.contactPerson || null,
+    phone: vendorData.phone || null,
+    email: vendorData.email || null,
+    notes: vendorData.notes || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!supabase) {
+    if (typeof window !== 'undefined') {
+      const current = await getVendors();
+      const updated = current.map(v => v.id === id ? { ...v, ...payload } : v);
+      localStorage.setItem('jerseyhut_vendors', JSON.stringify(updated));
+    }
+    return { id, ...payload };
+  }
+
+  const { data, error } = await supabase
+    .from('vendors')
+    .update(payload)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (typeof window !== 'undefined') {
+    const current = await getVendors();
+    const updated = current.map(v => v.id === id ? data : v);
+    localStorage.setItem('jerseyhut_vendors', JSON.stringify(updated));
+  }
+
+  return data;
+}
+
+export async function deleteVendor(id) {
+  if (typeof window !== 'undefined') {
+    const current = await getVendors();
+    const updated = current.filter(v => v.id !== id);
+    localStorage.setItem('jerseyhut_vendors', JSON.stringify(updated));
+  }
+
+  if (!supabase) return true;
+
+  const { error } = await supabase
+    .from('vendors')
     .delete()
     .eq('id', id);
 
@@ -234,7 +514,7 @@ export const DEFAULT_CATEGORY_COVERS = [
   {
     id: 'cover_oversized',
     category_id: 'oversized',
-    name: 'OVERSIZED',
+    name: 'OVERSIZED T',
     path: '/collections/oversized',
     image_url: 'https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/5829b963-ba08-493c-9b38-5ef854f206ea/1786289541562_0.jpg',
     description: 'Heavyweight boxy streetwear football jerseys.',

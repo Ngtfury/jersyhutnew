@@ -15,10 +15,12 @@ export default function Header() {
   const { openAccount } = useModals();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [countdown, setCountdown] = useState({ hours: 23, minutes: 59, seconds: 44 });
   const [showAnnouncement, setShowAnnouncement] = useState(true);
 
   useEffect(() => {
+    setMounted(true);
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
@@ -43,7 +45,7 @@ export default function Header() {
     { label: "HOME", path: "/" },
     { label: "FULL SLEEVES", path: "/collections/full-sleeves" },
     { label: "HALF SLEEVES", path: "/collections/half-sleeves" },
-    { label: "OVERSIZED", path: "/collections/oversized" },
+    { label: "OVERSIZED T", path: "/collections/oversized" },
     { label: "ABOUT US", path: "/pages/about-us" },
   ];
 
@@ -51,18 +53,19 @@ export default function Header() {
     <>
       {/* Top Announcement Bar */}
       {showAnnouncement && (
-        <div className="announcement-bar">
-          <div className="countdown">
+        <div className="announcement-bar" suppressHydrationWarning>
+          <div className="countdown" suppressHydrationWarning>
             <span>SALE ENDS IN:</span>
             <span>00d</span> :
-            <span>{String(countdown.hours).padStart(2, '0')}h</span> :
-            <span>{String(countdown.minutes).padStart(2, '0')}m</span> :
-            <span>{String(countdown.seconds).padStart(2, '0')}s</span>
+            <span suppressHydrationWarning>{mounted ? String(countdown.hours).padStart(2, '0') : '23'}h</span> :
+            <span suppressHydrationWarning>{mounted ? String(countdown.minutes).padStart(2, '0') : '59'}m</span> :
+            <span suppressHydrationWarning>{mounted ? String(countdown.seconds).padStart(2, '0') : '44'}s</span>
           </div>
           <button 
             onClick={() => setShowAnnouncement(false)} 
             style={{ color: 'rgba(255,255,255,0.5)', padding: '2px', cursor: 'pointer' }}
             aria-label="Close Announcement"
+            suppressHydrationWarning
           >
             <X size={13} />
           </button>
@@ -78,6 +81,7 @@ export default function Header() {
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open Navigation Menu"
               className="action-btn"
+              suppressHydrationWarning
             >
               <Menu size={22} />
             </button>
@@ -112,6 +116,7 @@ export default function Header() {
               onClick={openSearch}
               className="action-btn"
               aria-label="Search Jerseys"
+              suppressHydrationWarning
             >
               <Search size={19} strokeWidth={1.8} />
             </button>
@@ -120,6 +125,7 @@ export default function Header() {
               onClick={openAccount}
               className="action-btn"
               aria-label="Customer Account"
+              suppressHydrationWarning
             >
               <User size={19} strokeWidth={1.8} />
             </button>
@@ -128,6 +134,7 @@ export default function Header() {
               onClick={openCart}
               className="action-btn"
               aria-label={`Shopping Bag containing ${totalCount} items`}
+              suppressHydrationWarning
             >
               <ShoppingBag size={19} strokeWidth={1.8} />
               {totalCount > 0 && (
@@ -148,6 +155,7 @@ export default function Header() {
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Close menu"
             style={{ color: '#fff', padding: '0.5rem' }}
+            suppressHydrationWarning
           >
             <X size={24} />
           </button>
@@ -171,6 +179,7 @@ export default function Header() {
           <button 
             onClick={() => { setMobileMenuOpen(false); openSearch(); }}
             style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: '0.8rem', fontSize: '0.85rem', letterSpacing: '0.15em', textTransform: 'uppercase' }}
+            suppressHydrationWarning
           >
             <Search size={18} />
             Search Catalog
@@ -178,6 +187,7 @@ export default function Header() {
           <button 
             onClick={() => { setMobileMenuOpen(false); openAccount(); }}
             style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: '0.8rem', fontSize: '0.85rem', letterSpacing: '0.15em', textTransform: 'uppercase' }}
+            suppressHydrationWarning
           >
             <User size={18} />
             My Account

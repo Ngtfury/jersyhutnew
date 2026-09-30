@@ -31,7 +31,12 @@ export default function BestSellers() {
   const filteredProducts = useMemo(() => {
     const current = tabs.find(t => t.id === activeTab);
     if (!current) return [];
-    return allProducts.filter(p => p.category === current.filterCategory);
+    return allProducts.filter(p => {
+      if (current.id === "OVERSIZED T") {
+        return p.category === "OVERSIZED T" || p.category === "OVERSIZED";
+      }
+      return p.category === current.filterCategory;
+    });
   }, [activeTab, allProducts]);
 
   return (

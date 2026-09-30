@@ -402,7 +402,9 @@ export default function Product({ productId }) {
                       <strong style={{ color: '#000' }}>{product.material || 'PREMIUM DOTKNIT POLYESTER'}</strong>
 
                       <span style={{ color: '#888' }}>COLORWAY:</span>
-                      <strong style={{ color: '#000' }}>{product.color || 'OFFICIAL PALETTE'}</strong>
+                      <strong style={{ color: '#000' }}>
+                        {product.primaryColor ? `${product.primaryColor}${product.secondaryColor ? ' / ' + product.secondaryColor : ''}` : (product.color || 'OFFICIAL PALETTE')}
+                      </strong>
                     </div>
                   </div>
                 )}
