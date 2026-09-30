@@ -8,7 +8,7 @@ export default function EditorialBanner() {
   return (
     <section className="editorial-banner-section" aria-label="Editorial Campaign Banner">
       <img
-        src="https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/60c3d5cb-697b-4af4-ba69-0b070ddf77e0/1786289561135_0.jpg"
+        src="/images/editorial-banner.jpg"
         alt="Jersey Hut Football Heritage"
         className="editorial-banner-img"
         loading="lazy"

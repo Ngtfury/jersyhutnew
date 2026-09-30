@@ -21,18 +21,9 @@ export const DEFAULT_CATEGORIES = [
 ];
 
 /**
- * DEFAULT VENDORS (Fallback starter data)
+ * DEFAULT VENDORS (Zero vendor fallback for clean production)
  */
-export const DEFAULT_VENDORS = [
-  {
-    id: 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d',
-    name: 'Apex Jersey Manufacturers',
-    contact_person: 'Rahul Verma',
-    phone: '+91 98765 43210',
-    email: 'sales@apexjerseys.in',
-    notes: 'Primary domestic supplier for sublimation & dotknit matchday shirts.'
-  }
-];
+export const DEFAULT_VENDORS = [];
 
 /**
  * Normalizes product data from Supabase snake_case to frontend camelCase
@@ -367,12 +358,18 @@ export async function getVendors() {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(v => v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d' && v.name !== 'Apex Jersey Manufacturers');
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem('jerseyhut_vendors', JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
       } catch (e) {}
     }
   }
 
-  if (!supabase) return DEFAULT_VENDORS;
+  if (!supabase) return [];
 
   try {
     const { data, error } = await supabase
@@ -380,17 +377,18 @@ export async function getVendors() {
       .select('*')
       .order('name', { ascending: true });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
+      const cleaned = data.filter(v => v.name !== 'Apex Jersey Manufacturers' && v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d');
       if (typeof window !== 'undefined') {
-        localStorage.setItem('jerseyhut_vendors', JSON.stringify(data));
+        localStorage.setItem('jerseyhut_vendors', JSON.stringify(cleaned));
       }
-      return data;
+      return cleaned;
     }
   } catch (err) {
-    console.warn('Could not fetch vendors from Supabase, using defaults:', err.message);
+    console.warn('Could not fetch vendors from Supabase:', err.message);
   }
 
-  return DEFAULT_VENDORS;
+  return [];
 }
 
 export async function createVendor(vendorData) {
@@ -525,7 +523,7 @@ export const DEFAULT_CATEGORY_COVERS = [
     category_id: 'oversized',
     name: 'OVERSIZED T',
     path: '/collections/oversized',
-    image_url: 'https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/5829b963-ba08-493c-9b38-5ef854f206ea/1786289541562_0.jpg',
+    image_url: '/images/category-oversized.jpg',
     description: 'Heavyweight boxy streetwear football jerseys.',
   },
   {
@@ -533,7 +531,7 @@ export const DEFAULT_CATEGORY_COVERS = [
     category_id: 'tshirts',
     name: 'TSHIRTS',
     path: '/collections/tshirts',
-    image_url: 'https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/c7b2ff7a-fdc7-47fd-b2c3-4786acc1c245/1786289573397_0.jpg',
+    image_url: '/images/category-tshirts.jpg',
     description: 'Minimal football warmup & graphic lifestyle tees.',
   },
 ];

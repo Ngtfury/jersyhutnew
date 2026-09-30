@@ -76,10 +76,10 @@ export default function BestSellers() {
             <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#71717a' }}>
               <Package size={36} color="#a1a1aa" style={{ margin: '0 auto 0.75rem', opacity: 0.6 }} />
               <p style={{ letterSpacing: '0.12em', textTransform: 'uppercase', fontSize: '0.8125rem', fontWeight: 700, color: '#000000', marginBottom: '0.4rem' }}>
-                No kits added in {activeTab}
+                New Drops Coming Soon
               </p>
               <p style={{ fontSize: '0.75rem', color: '#888888', maxWidth: '380px', margin: '0 auto' }}>
-                Your database is connected and empty. Add new jerseys in the <Link href="/admin" style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}>Admin Dashboard</Link>.
+                Stay tuned! Fresh authentic {activeTab} kits will be dropping shortly.
               </p>
             </div>
           )}

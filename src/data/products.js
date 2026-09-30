@@ -25,14 +25,14 @@ export const CATEGORIES = [
     id: "oversized",
     name: "OVERSIZED",
     path: "/collections/oversized",
-    image: "https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/5829b963-ba08-493c-9b38-5ef854f206ea/1786289541562_0.jpg",
+    image: "/images/category-oversized.jpg",
     description: "Heavyweight boxy streetwear football jerseys."
   },
   {
     id: "tshirts",
     name: "TSHIRTS",
     path: "/collections/tshirts",
-    image: "https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/c7b2ff7a-fdc7-47fd-b2c3-4786acc1c245/1786289573397_0.jpg",
+    image: "/images/category-tshirts.jpg",
     description: "Minimal football warmup & graphic lifestyle tees."
   }
 ];

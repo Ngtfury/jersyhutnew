@@ -84,7 +84,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('manage'); // 'manage' | 'add' | 'vendors' | 'categories' | 'banners'
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [vendors, setVendors] = useState(DEFAULT_VENDORS);
+  const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('ALL');
@@ -163,17 +163,26 @@ export default function AdminPage() {
         getCategoryCovers()
       ]);
 
-      setProducts(prodsData || []);
+      setProducts(Array.isArray(prodsData) ? prodsData : []);
       if (catsData && catsData.length > 0) setCategories(catsData);
-      if (vendsData && vendsData.length > 0) {
-        setVendors(vendsData);
-        if (!selectedVendorId) setSelectedVendorId(vendsData[0].id);
+      
+      const cleanVendors = Array.isArray(vendsData)
+        ? vendsData.filter(v => v.name !== 'Apex Jersey Manufacturers' && v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d')
+        : [];
+      setVendors(cleanVendors);
+      if (cleanVendors.length > 0) {
+        if (!selectedVendorId || !cleanVendors.some(v => v.id === selectedVendorId)) {
+          setSelectedVendorId(cleanVendors[0].id);
+        }
+      } else {
+        setSelectedVendorId(null);
       }
+
       if (heroData) setHeroBanner(heroData);
       if (coversData) setCategoryCovers(coversData);
     } catch (err) {
       console.error('Failed to load data:', err);
-      setProducts(LOCAL_PRODUCTS);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -1994,7 +2003,7 @@ export default function AdminPage() {
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.35rem' }}>Vendor / Company Name *</label>
                   <input
                     type="text"
-                    placeholder="e.g. Apex Kit Manufacturing"
+                    placeholder="e.g. Skyline Apparels Ltd"
                     value={vendorForm.name}
                     onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
                     required
@@ -2007,7 +2016,7 @@ export default function AdminPage() {
                     <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.35rem' }}>Contact Person</label>
                     <input
                       type="text"
-                      placeholder="e.g. Rahul Verma"
+                      placeholder="e.g. Contact Name"
                       value={vendorForm.contact_person}
                       onChange={(e) => setVendorForm({ ...vendorForm, contact_person: e.target.value })}
                       style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '4px', padding: '0.625rem', color: '#fff', fontSize: '0.8125rem' }}
@@ -2030,7 +2039,7 @@ export default function AdminPage() {
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.35rem' }}>Email Address</label>
                   <input
                     type="email"
-                    placeholder="e.g. sales@apexkits.in"
+                    placeholder="e.g. supplier@domain.com"
                     value={vendorForm.email}
                     onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
                     style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '4px', padding: '0.625rem', color: '#fff', fontSize: '0.8125rem' }}

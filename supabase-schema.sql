@@ -287,7 +287,7 @@ VALUES
     'OVERSIZED T',
     NULL,
     NULL,
-    'https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/5829b963-ba08-493c-9b38-5ef854f206ea/1786289541562_0.jpg',
+    '/images/category-oversized.jpg',
     '/collections/oversized',
     'Heavyweight boxy streetwear football jerseys.',
     '{"category_id": "oversized-t"}'::jsonb
@@ -297,22 +297,9 @@ VALUES
     'TSHIRTS',
     NULL,
     NULL,
-    'https://jleqlgqxheygghnrluvc.supabase.co/storage/v1/object/public/products/c7b2ff7a-fdc7-47fd-b2c3-4786acc1c245/1786289573397_0.jpg',
+    '/images/category-tshirts.jpg',
     '/collections/tshirts',
     'Minimal football warmup & graphic lifestyle tees.',
     '{"category_id": "tshirts"}'::jsonb
-  )
-ON CONFLICT (id) DO NOTHING;
-
--- 4.3 Default Vendor Seed (Optional starter supplier)
-INSERT INTO public.vendors (id, name, contact_person, phone, email, notes)
-VALUES
-  (
-    'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d',
-    'Apex Jersey Manufacturers',
-    'Rahul Verma',
-    '+91 98765 43210',
-    'sales@apexjerseys.in',
-    'Primary domestic supplier for sublimation & dotknit matchday shirts.'
   )
 ON CONFLICT (id) DO NOTHING;
