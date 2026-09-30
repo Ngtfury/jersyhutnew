@@ -8,9 +8,20 @@ export default function CategoryGrid() {
   const [categories, setCategories] = useState(DEFAULT_CATEGORY_COVERS);
 
   useEffect(() => {
-    getCategoryCovers().then(data => {
-      if (data && data.length > 0) setCategories(data);
-    }).catch(console.error);
+    const loadCovers = () => {
+      getCategoryCovers().then(data => {
+        if (data && data.length > 0) setCategories(data);
+      }).catch(console.error);
+    };
+
+    loadCovers();
+    window.addEventListener('jerseyhut_categories_updated', loadCovers);
+    window.addEventListener('storage', loadCovers);
+
+    return () => {
+      window.removeEventListener('jerseyhut_categories_updated', loadCovers);
+      window.removeEventListener('storage', loadCovers);
+    };
   }, []);
 
   return (

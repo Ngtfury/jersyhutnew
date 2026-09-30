@@ -35,7 +35,10 @@ export default function Footer() {
                 <Link href="/collections/half-sleeves" className="footer-link">Half Sleeves</Link>
               </li>
               <li>
-                <Link href="/collections/oversized" className="footer-link">Oversized</Link>
+                <Link href="/collections/oversized" className="footer-link">Oversized T</Link>
+              </li>
+              <li>
+                <Link href="/collections/tshirts" className="footer-link">T-Shirts</Link>
               </li>
             </ul>
           </div>

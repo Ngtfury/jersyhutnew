@@ -80,6 +80,7 @@ const COLOR_PRESETS = [
 ];
 
 export default function AdminPage() {
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('manage'); // 'manage' | 'add' | 'vendors' | 'categories' | 'banners'
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -179,6 +180,7 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     loadData();
   }, []);
 
@@ -375,7 +377,12 @@ export default function AdminPage() {
       setCategories(prev => [...prev.filter(c => c.name !== created.name), created]);
       setNewCatName('');
       setNewCatDesc('');
-      showToast(`Category "${created.name}" created!`);
+      
+      // Immediately refresh category cover cards so the new category gets its cover card in banners tab
+      const updatedCovers = await getCategoryCovers();
+      if (updatedCovers) setCategoryCovers(updatedCovers);
+
+      showToast(`Category "${created.name}" created! Automatically added to Storefront navigation & covers.`);
     } catch (err) {
       console.error('Failed to create category:', err);
       showToast(`Error: ${err.message}`, 'error');
@@ -389,6 +396,10 @@ export default function AdminPage() {
     try {
       await deleteCategory(id);
       setCategories(prev => prev.filter(c => c.id !== id));
+
+      const updatedCovers = await getCategoryCovers();
+      if (updatedCovers) setCategoryCovers(updatedCovers);
+
       showToast(`Category "${name}" removed.`);
     } catch (err) {
       showToast(`Error: ${err.message}`, 'error');
@@ -573,8 +584,19 @@ export default function AdminPage() {
     return total <= threshold;
   }).length;
 
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: '#f4f4f5', padding: '4rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+        <div style={{ width: '28px', height: '28px', border: '2px solid #27272a', borderTopColor: '#ffffff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize: '0.8125rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#71717a', fontWeight: 600 }}>
+          Loading Admin Dashboard...
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div suppressHydrationWarning style={{ minHeight: '100vh', backgroundColor: '#09090b', color: '#f4f4f5', padding: '2rem 1.5rem 6rem' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: '#f4f4f5', padding: '2rem 1.5rem 6rem' }}>
       <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
         
         {/* Top Navigation & Status Bar */}

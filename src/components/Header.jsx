@@ -7,6 +7,7 @@ import { Search, User, ShoppingBag, Menu, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
 import { useModals } from '../app/providers';
+import { getCategories, DEFAULT_CATEGORIES } from '../lib/supabase';
 
 export default function Header() {
   const pathname = usePathname();
@@ -18,6 +19,7 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const [countdown, setCountdown] = useState({ hours: 23, minutes: 59, seconds: 44 });
   const [showAnnouncement, setShowAnnouncement] = useState(true);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     setMounted(true);
@@ -25,7 +27,22 @@ export default function Header() {
       setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    const loadNavCategories = () => {
+      getCategories().then(data => {
+        if (data && data.length > 0) setCategories(data);
+      }).catch(console.error);
+    };
+
+    loadNavCategories();
+    window.addEventListener('jerseyhut_categories_updated', loadNavCategories);
+    window.addEventListener('storage', loadNavCategories);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('jerseyhut_categories_updated', loadNavCategories);
+      window.removeEventListener('storage', loadNavCategories);
+    };
   }, []);
 
   // Simple countdown timer tick
@@ -43,9 +60,14 @@ export default function Header() {
 
   const navLinks = [
     { label: "HOME", path: "/" },
-    { label: "FULL SLEEVES", path: "/collections/full-sleeves" },
-    { label: "HALF SLEEVES", path: "/collections/half-sleeves" },
-    { label: "OVERSIZED T", path: "/collections/oversized" },
+    ...categories.map(c => {
+      const slug = c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const path = (slug === 'oversized-t' || slug === 'oversized') ? '/collections/oversized' : `/collections/${slug}`;
+      return {
+        label: c.name,
+        path: path,
+      };
+    }),
     { label: "ABOUT US", path: "/pages/about-us" },
   ];
 

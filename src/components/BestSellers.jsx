@@ -3,39 +3,47 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import ProductGrid from './ProductGrid';
-import { getProducts } from '../lib/supabase';
+import { getProducts, getCategories, DEFAULT_CATEGORIES } from '../lib/supabase';
 import { Package } from 'lucide-react';
 
 export default function BestSellers() {
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [activeTab, setActiveTab] = useState("FULL SLEEVES");
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getProducts().then(data => {
-      setAllProducts(Array.isArray(data) ? data : []);
-      setLoading(false);
-    }).catch(err => {
-      console.error(err);
-      setLoading(false);
-    });
+    const fetchData = async () => {
+      try {
+        const [prods, cats] = await Promise.all([getProducts(), getCategories()]);
+        setAllProducts(Array.isArray(prods) ? prods : []);
+        if (Array.isArray(cats) && cats.length > 0) {
+          setCategories(cats);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    window.addEventListener('jerseyhut_categories_updated', fetchData);
+    window.addEventListener('storage', fetchData);
+
+    return () => {
+      window.removeEventListener('jerseyhut_categories_updated', fetchData);
+      window.removeEventListener('storage', fetchData);
+    };
   }, []);
 
-  const tabs = [
-    { id: "FULL SLEEVES", label: "FULL SLEEVES", filterCategory: "FULL SLEEVES" },
-    { id: "HALF SLEEVES", label: "HALF SLEEVES", filterCategory: "HALF SLEEVES" },
-    { id: "OVERSIZED T", label: "OVERSIZED T", filterCategory: "OVERSIZED" },
-    { id: "TSHIRTS", label: "TSHIRTS", filterCategory: "TSHIRTS" },
-  ];
-
   const filteredProducts = useMemo(() => {
-    const current = tabs.find(t => t.id === activeTab);
-    if (!current) return [];
+    if (!activeTab) return [];
     return allProducts.filter(p => {
-      if (current.id === "OVERSIZED T") {
+      if (activeTab === "OVERSIZED T") {
         return p.category === "OVERSIZED T" || p.category === "OVERSIZED";
       }
-      return p.category === current.filterCategory;
+      return p.category === activeTab || p.category?.toUpperCase() === activeTab?.toUpperCase();
     });
   }, [activeTab, allProducts]);
 
@@ -46,16 +54,16 @@ export default function BestSellers() {
           <h2 className="new-popular-title">NEW AND POPULAR</h2>
           
           <div className="bestsellers-tabs new-popular-tabs" role="tablist">
-            {tabs.map((tab) => (
+            {categories.map((cat) => (
               <button
-                key={tab.id}
+                key={cat.id || cat.name}
                 role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`box-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-                id={`tab-${tab.id.replace(/\s+/g, '-').toLowerCase()}`}
+                aria-selected={activeTab === cat.name}
+                onClick={() => setActiveTab(cat.name)}
+                className={`box-tab-btn ${activeTab === cat.name ? 'active' : ''}`}
+                id={`tab-${cat.name.replace(/\s+/g, '-').toLowerCase()}`}
               >
-                {tab.label}
+                {cat.name}
               </button>
             ))}
           </div>

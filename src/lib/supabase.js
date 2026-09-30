@@ -302,31 +302,38 @@ export async function createCategory(catData) {
     description: catData.description || null,
   };
 
+  let result = null;
   if (!supabase) {
-    const mock = { ...payload, id: 'cat-' + Date.now() };
+    result = { ...payload, id: 'cat-' + Date.now() };
     if (typeof window !== 'undefined') {
       const current = await getCategories();
-      const updated = [...current, mock];
+      const updated = [...current, result];
       localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
     }
-    return mock;
+  } else {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) throw error;
+    result = data;
+
+    if (typeof window !== 'undefined') {
+      const current = await getCategories();
+      const updated = [...current.filter(c => c.name !== data.name), data];
+      localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+    }
   }
 
-  const { data, error } = await supabase
-    .from('categories')
-    .insert([payload])
-    .select()
-    .single();
-
-  if (error) throw error;
-
+  // Clear category covers cache so newly added category immediately appears in covers & homepage
   if (typeof window !== 'undefined') {
-    const current = await getCategories();
-    const updated = [...current.filter(c => c.name !== data.name), data];
-    localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+    localStorage.removeItem('jerseyhut_category_covers');
+    window.dispatchEvent(new CustomEvent('jerseyhut_categories_updated'));
   }
 
-  return data;
+  return result;
 }
 
 export async function deleteCategory(id) {
@@ -334,6 +341,8 @@ export async function deleteCategory(id) {
     const current = await getCategories();
     const updated = current.filter(c => c.id !== id);
     localStorage.setItem('jerseyhut_categories', JSON.stringify(updated));
+    localStorage.removeItem('jerseyhut_category_covers');
+    window.dispatchEvent(new CustomEvent('jerseyhut_categories_updated'));
   }
 
   if (!supabase) return true;
@@ -634,14 +643,53 @@ export async function saveHeroBanner(bannerData) {
 }
 
 export async function getCategoryCovers() {
+  const allCategories = await getCategories();
+
+  // Create base covers ensuring every active category has a cover card definition
+  const baseCovers = allCategories.map(cat => {
+    const slug = cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const existingDefault = DEFAULT_CATEGORY_COVERS.find(
+      def => def.category_id === slug || 
+             def.name.toUpperCase() === cat.name.toUpperCase() ||
+             (cat.name === 'OVERSIZED T' && def.id === 'cover_oversized')
+    );
+
+    if (existingDefault) {
+      return {
+        ...existingDefault,
+        name: cat.name,
+      };
+    }
+
+    const coverId = `cover_${slug.replace(/-/g, '_')}`;
+    const coverPath = `/collections/${slug}`;
+    return {
+      id: coverId,
+      category_id: slug,
+      name: cat.name,
+      path: coverPath,
+      image_url: '/images/hero.jpg',
+      description: cat.description || `Curated collection of ${cat.name} jerseys.`,
+    };
+  });
+
   if (typeof window !== 'undefined') {
     const cached = localStorage.getItem('jerseyhut_category_covers');
     if (cached) {
-      try { return JSON.parse(cached); } catch (e) {}
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge dynamic baseCovers with any stored uploaded URLs
+          return baseCovers.map(base => {
+            const found = parsed.find(p => p.id === base.id || p.category_id === base.category_id);
+            return found ? { ...base, ...found } : base;
+          });
+        }
+      } catch (e) {}
     }
   }
 
-  if (!supabase) return DEFAULT_CATEGORY_COVERS;
+  if (!supabase) return baseCovers;
 
   try {
     const { data, error } = await supabase
@@ -649,9 +697,9 @@ export async function getCategoryCovers() {
       .select('*')
       .like('id', 'cover_%');
 
-    if (!error && data && data.length > 0) {
-      const merged = DEFAULT_CATEGORY_COVERS.map(def => {
-        const found = data.find(d => d.id === def.id);
+    if (!error && Array.isArray(data)) {
+      const merged = baseCovers.map(def => {
+        const found = data.find(d => d.id === def.id || d.id === `cover_${def.category_id?.replace(/-/g, '_')}`);
         if (!found) return def;
         return {
           ...def,
@@ -661,6 +709,7 @@ export async function getCategoryCovers() {
           path: found.link_url || def.path,
         };
       });
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('jerseyhut_category_covers', JSON.stringify(merged));
       }
@@ -670,7 +719,7 @@ export async function getCategoryCovers() {
     console.warn('Could not fetch category covers from Supabase:', err);
   }
 
-  return DEFAULT_CATEGORY_COVERS;
+  return baseCovers;
 }
 
 export async function saveCategoryCovers(covers) {
