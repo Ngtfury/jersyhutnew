@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '../context/CartContext';
 import { X, Trash2, ArrowRight, ShoppingBag } from 'lucide-react';
+import { decrementProductStock } from '../lib/supabase';
 
 export default function CartDrawer({ onCheckout }) {
   const router = useRouter();
@@ -147,7 +148,9 @@ export default function CartDrawer({ onCheckout }) {
             </p>
 
             <button
-              onClick={() => {
+              onClick={async () => {
+                const itemsToOrder = [...cartItems];
+                decrementProductStock(itemsToOrder).catch(console.error);
                 closeCart();
                 onCheckout ? onCheckout() : alert("Thank you for choosing Jersey Hut! Routing to secure Indian UPI & Card Payment Gateway...");
               }}

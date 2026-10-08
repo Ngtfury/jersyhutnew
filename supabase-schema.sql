@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
   phone TEXT,
   email TEXT,
   notes TEXT,
+  min_order_quantity INTEGER DEFAULT 10,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -77,6 +78,7 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS year TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS team TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS version TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS kit_type TEXT;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS min_order_quantity INTEGER DEFAULT 10;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products (category);

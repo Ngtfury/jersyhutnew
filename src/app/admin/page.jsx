@@ -71,6 +71,7 @@ export const KIT_TYPES = [
   { id: 'HOME', label: 'Home Kit' },
   { id: 'AWAY', label: 'Away Kit' },
   { id: 'THIRD', label: 'Third Kit' },
+  { id: 'FOURTH', label: 'Fourth Kit' },
   { id: 'SPECIAL', label: 'Special Edition' }
 ];
 
@@ -123,6 +124,7 @@ export default function AdminPage() {
   const [editingVendor, setEditingVendor] = useState(null);
   const [vendorForm, setVendorForm] = useState({
     name: '',
+    min_order_quantity: 10,
     contact_person: '',
     phone: '',
     email: '',
@@ -171,8 +173,7 @@ export default function AdminPage() {
     isBestSeller: false,
     featured: false,
     vendorId: '',
-    vendorPrice: '',
-    minStockAlert: 5
+    vendorPrice: ''
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -355,8 +356,7 @@ export default function AdminPage() {
       isBestSeller: Boolean(product.isBestSeller),
       featured: Boolean(product.featured),
       vendorId: product.vendorId || '',
-      vendorPrice: product.vendorPrice !== undefined && product.vendorPrice !== null ? product.vendorPrice : '',
-      minStockAlert: product.minStockAlert !== undefined && product.minStockAlert !== null ? product.minStockAlert : 5
+      vendorPrice: product.vendorPrice !== undefined && product.vendorPrice !== null ? product.vendorPrice : ''
     });
     setIsNewTeamMode(false);
     setActiveTab('add');
@@ -411,7 +411,6 @@ export default function AdminPage() {
       sizes: formData.active_sizes,
       images: formData.images.length > 0 ? formData.images : ['/images/placeholder-jersey.jpg'],
       vendorPrice: formData.vendorPrice !== '' ? Number(formData.vendorPrice) : undefined,
-      minStockAlert: formData.minStockAlert !== '' ? Number(formData.minStockAlert) : 5,
     };
 
     try {
@@ -506,6 +505,7 @@ export default function AdminPage() {
       setEditingVendor(vendorToEdit);
       setVendorForm({
         name: vendorToEdit.name,
+        min_order_quantity: vendorToEdit.min_order_quantity !== undefined && vendorToEdit.min_order_quantity !== null ? vendorToEdit.min_order_quantity : 10,
         contact_person: vendorToEdit.contact_person || '',
         phone: vendorToEdit.phone || '',
         email: vendorToEdit.email || '',
@@ -513,7 +513,7 @@ export default function AdminPage() {
       });
     } else {
       setEditingVendor(null);
-      setVendorForm({ name: '', contact_person: '', phone: '', email: '', notes: '' });
+      setVendorForm({ name: '', min_order_quantity: 10, contact_person: '', phone: '', email: '', notes: '' });
     }
     setShowVendorModal(true);
   };
@@ -525,14 +525,19 @@ export default function AdminPage() {
       return;
     }
 
+    const payload = {
+      ...vendorForm,
+      min_order_quantity: Math.max(1, parseInt(vendorForm.min_order_quantity, 10) || 10)
+    };
+
     setSubmittingVendor(true);
     try {
       if (editingVendor) {
-        const updated = await updateVendor(editingVendor.id, vendorForm);
+        const updated = await updateVendor(editingVendor.id, payload);
         setVendors(prev => prev.map(v => v.id === editingVendor.id ? { ...v, ...updated } : v));
         showToast(`Vendor "${vendorForm.name}" updated!`);
       } else {
-        const created = await createVendor(vendorForm);
+        const created = await createVendor(payload);
         setVendors(prev => [...prev, created]);
         setSelectedVendorId(created.id);
         showToast(`Vendor "${vendorForm.name}" profile created!`);
@@ -1476,7 +1481,7 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
                   {/* Select Vendor */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa', marginBottom: '0.35rem' }}>
@@ -1489,7 +1494,9 @@ export default function AdminPage() {
                     >
                       <option value="">-- No Vendor Assigned --</option>
                       {vendors.map(v => (
-                        <option key={v.id} value={v.id}>{v.name}</option>
+                        <option key={v.id} value={v.id}>
+                          {v.name} (MOQ: {v.min_order_quantity || 10} units)
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1509,19 +1516,20 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  {/* Min Stock Alert Count */}
+                  {/* Vendor MOQ Info Display */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa', marginBottom: '0.35rem' }}>
-                      Min Stock Reorder Alert Count
+                      Vendor Min Order Quantity (MOQ)
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="5"
-                      value={formData.minStockAlert}
-                      onChange={(e) => setFormData({ ...formData, minStockAlert: e.target.value })}
-                      style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '0.625rem 0.75rem', color: '#fff', fontSize: '0.875rem', outline: 'none' }}
-                    />
+                    <div style={{ padding: '0.625rem 0.75rem', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', fontSize: '0.8125rem', color: '#d4d4d8' }}>
+                      {formData.vendorId ? (
+                        <span>
+                          Target: <strong style={{ color: '#60a5fa' }}>{vendors.find(v => v.id === formData.vendorId)?.min_order_quantity || 10} units</strong> across all jerseys
+                        </span>
+                      ) : (
+                        <span style={{ color: '#71717a' }}>Select a vendor above to view MOQ</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1802,13 +1810,10 @@ export default function AdminPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {vendors.map(v => {
                     const isSelected = v.id === currentVendor?.id;
-                    const count = products.filter(p => p.vendorId === v.id).length;
-                    const lowCount = products.filter(p => {
-                      if (p.vendorId !== v.id) return false;
-                      const stock = getProductTotalStock(p);
-                      const alert = p.minStockAlert !== undefined ? p.minStockAlert : 5;
-                      return stock <= alert;
-                    }).length;
+                    const vProds = products.filter(p => p.vendorId === v.id);
+                    const vTotalStock = vProds.reduce((sum, p) => sum + getProductTotalStock(p), 0);
+                    const vMOQ = v.min_order_quantity !== undefined && v.min_order_quantity !== null ? Number(v.min_order_quantity) : 10;
+                    const isBelowMOQ = vProds.length > 0 && vTotalStock <= vMOQ;
 
                     return (
                       <div
@@ -1816,7 +1821,7 @@ export default function AdminPage() {
                         onClick={() => setSelectedVendorId(v.id)}
                         style={{
                           backgroundColor: isSelected ? '#27272a' : '#18181b',
-                          border: isSelected ? '1px solid #ffffff' : '1px solid #27272a',
+                          border: isSelected ? '1px solid #ffffff' : isBelowMOQ ? '1px solid #ef4444' : '1px solid #27272a',
                           borderRadius: '8px',
                           padding: '1.25rem',
                           cursor: 'pointer',
@@ -1827,9 +1832,17 @@ export default function AdminPage() {
                           <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700, color: '#fff' }}>
                             {v.name}
                           </h4>
-                          {lowCount > 0 && (
-                            <span style={{ backgroundColor: 'rgba(234, 179, 8, 0.2)', color: '#facc15', fontSize: '0.625rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
-                              {lowCount} LOW
+                          {isBelowMOQ ? (
+                            <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.625rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                              🚨 BELOW MOQ ({vTotalStock}/{vMOQ})
+                            </span>
+                          ) : vTotalStock > 0 ? (
+                            <span style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', fontSize: '0.625rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
+                              {vTotalStock} UNITS
+                            </span>
+                          ) : (
+                            <span style={{ backgroundColor: '#27272a', color: '#a1a1aa', fontSize: '0.625rem', padding: '2px 6px', borderRadius: '4px' }}>
+                              0 UNITS
                             </span>
                           )}
                         </div>
@@ -1841,8 +1854,8 @@ export default function AdminPage() {
                         )}
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#71717a', borderTop: '1px solid #27272a', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                          <span>{count} Products</span>
-                          {v.phone && <span>{v.phone}</span>}
+                          <span>{vProds.length} Products</span>
+                          <span>MOQ: {vMOQ} units</span>
                         </div>
                       </div>
                     );
@@ -1850,150 +1863,178 @@ export default function AdminPage() {
                 </div>
 
                 {/* Selected Vendor Detail & Stock Analytics */}
-                {currentVendor && (
-                  <div style={{ backgroundColor: '#18181b', borderRadius: '8px', border: '1px solid #27272a', padding: '1.75rem' }}>
-                    {/* Vendor Header */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid #27272a' }}>
-                      <div>
-                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.1em', color: '#60a5fa', textTransform: 'uppercase' }}>
-                          Vendor Profile
-                        </span>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800, textTransform: 'uppercase', margin: '0.25rem 0 0.5rem', color: '#fff' }}>
-                          {currentVendor.name}
-                        </h3>
+                {currentVendor && (() => {
+                  const vendorMOQ = currentVendor.min_order_quantity !== undefined && currentVendor.min_order_quantity !== null ? Number(currentVendor.min_order_quantity) : 10;
+                  const isVendorBelowMOQ = vendorProducts.length > 0 && vendorTotalStock <= vendorMOQ;
 
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem', color: '#a1a1aa' }}>
-                          {currentVendor.contact_person && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Users size={14} /> {currentVendor.contact_person}
-                            </span>
-                          )}
-                          {currentVendor.phone && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Phone size={14} /> {currentVendor.phone}
-                            </span>
-                          )}
-                          {currentVendor.email && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Mail size={14} /> {currentVendor.email}
-                            </span>
+                  return (
+                    <div style={{ backgroundColor: '#18181b', borderRadius: '8px', border: isVendorBelowMOQ ? '1px solid #ef4444' : '1px solid #27272a', padding: '1.75rem' }}>
+                      {/* Vendor Header */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid #27272a' }}>
+                        <div>
+                          <span style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.1em', color: '#60a5fa', textTransform: 'uppercase' }}>
+                            Vendor Profile
+                          </span>
+                          <h3 style={{ fontSize: '1.5rem', fontWeight: 800, textTransform: 'uppercase', margin: '0.25rem 0 0.5rem', color: '#fff' }}>
+                            {currentVendor.name}
+                          </h3>
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.8125rem', color: '#a1a1aa' }}>
+                            {currentVendor.contact_person && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Users size={14} /> {currentVendor.contact_person}
+                              </span>
+                            )}
+                            {currentVendor.phone && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Phone size={14} /> {currentVendor.phone}
+                              </span>
+                            )}
+                            {currentVendor.email && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Mail size={14} /> {currentVendor.email}
+                              </span>
+                            )}
+                          </div>
+
+                          {currentVendor.notes && (
+                            <p style={{ fontSize: '0.8125rem', color: '#71717a', margin: '0.75rem 0 0', fontStyle: 'italic' }}>
+                              "{currentVendor.notes}"
+                            </p>
                           )}
                         </div>
 
-                        {currentVendor.notes && (
-                          <p style={{ fontSize: '0.8125rem', color: '#71717a', margin: '0.75rem 0 0', fontStyle: 'italic' }}>
-                            "{currentVendor.notes}"
-                          </p>
-                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleOpenVendorModal(currentVendor)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#27272a', color: '#fff', border: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          >
+                            <Edit3 size={14} /> Edit Profile
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVendor(currentVendor.id, currentVendor.name)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#27272a', color: '#ef4444', border: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleOpenVendorModal(currentVendor)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#27272a', color: '#fff', border: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
-                        >
-                          <Edit3 size={14} /> Edit Profile
-                        </button>
-                        <button
-                          onClick={() => handleDeleteVendor(currentVendor.id, currentVendor.name)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#27272a', color: '#ef4444', border: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      {/* MOQ REORDER ALERT BANNER */}
+                      {isVendorBelowMOQ && (
+                        <div style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid #ef4444',
+                          borderRadius: '6px',
+                          padding: '1rem 1.25rem',
+                          marginBottom: '1.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem'
+                        }}>
+                          <AlertTriangle size={22} color="#ef4444" style={{ flexShrink: 0 }} />
+                          <div>
+                            <strong style={{ color: '#ef4444', textTransform: 'uppercase', fontSize: '0.875rem', letterSpacing: '0.04em' }}>
+                              🚨 REORDER REQUIRED — VENDOR MINIMUM ORDER QUANTITY (MOQ) REACHED
+                            </strong>
+                            <p style={{ color: '#fca5a5', fontSize: '0.8125rem', margin: '0.25rem 0 0', lineHeight: 1.5 }}>
+                              Total available stock across all jerseys supplied by <strong>{currentVendor.name}</strong> is currently <strong>{vendorTotalStock} units</strong>, which has fallen to or below the vendor MOQ threshold (<strong>{vendorMOQ} units</strong>). Place a replenishment batch order with this supplier!
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Analytics Summary Cards */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                        <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
+                          <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Supplied Products</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginTop: '0.25rem' }}>{vendorProducts.length}</div>
+                        </div>
+
+                        <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: isVendorBelowMOQ ? '1px solid #ef4444' : '1px solid #27272a' }}>
+                          <span style={{ fontSize: '0.6875rem', color: isVendorBelowMOQ ? '#ef4444' : '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Units Stock</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: isVendorBelowMOQ ? '#ef4444' : '#fff', marginTop: '0.25rem' }}>{vendorTotalStock}</div>
+                        </div>
+
+                        <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
+                          <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vendor MOQ</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#60a5fa', marginTop: '0.25rem' }}>{vendorMOQ} units</div>
+                        </div>
+
+                        <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
+                          <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inventory Value (Cost)</span>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80', marginTop: '0.25rem' }}>₹{vendorTotalCost}</div>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Analytics Summary Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                      <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
-                        <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Supplied Products</span>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginTop: '0.25rem' }}>{vendorProducts.length}</div>
-                      </div>
+                      {/* Products supplied by this vendor table */}
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 1rem', color: '#fff' }}>
+                        Jerseys Supplied by {currentVendor.name}
+                      </h4>
 
-                      <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
-                        <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Units Stock</span>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginTop: '0.25rem' }}>{vendorTotalStock}</div>
-                      </div>
+                      {vendorProducts.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '2.5rem', backgroundColor: '#09090b', borderRadius: '6px', border: '1px solid #27272a', color: '#71717a', fontSize: '0.8125rem' }}>
+                          No jerseys currently linked to this vendor. Assign this vendor when adding or editing jerseys in the product form!
+                        </div>
+                      ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #27272a', color: '#71717a', textAlign: 'left' }}>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Jersey</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Category</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Vendor Price</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Selling Price</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Size Breakdown</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Total Stock</th>
+                                <th style={{ padding: '0.75rem 0.5rem' }}>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {vendorProducts.map(p => {
+                                const stock = getProductTotalStock(p);
+                                const isLow = stock <= 3;
 
-                      <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: '1px solid #27272a' }}>
-                        <span style={{ fontSize: '0.6875rem', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inventory Value (Cost)</span>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80', marginTop: '0.25rem' }}>₹{vendorTotalCost}</div>
-                      </div>
-
-                      <div style={{ backgroundColor: '#09090b', padding: '1rem', borderRadius: '6px', border: vendorLowStockCount > 0 ? '1px solid #eab308' : '1px solid #27272a' }}>
-                        <span style={{ fontSize: '0.6875rem', color: vendorLowStockCount > 0 ? '#facc15' : '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Low Stock Alerts</span>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: vendorLowStockCount > 0 ? '#facc15' : '#fff', marginTop: '0.25rem' }}>{vendorLowStockCount}</div>
-                      </div>
-                    </div>
-
-                    {/* Products supplied by this vendor table */}
-                    <h4 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 1rem', color: '#fff' }}>
-                      Jerseys Supplied by {currentVendor.name}
-                    </h4>
-
-                    {vendorProducts.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2.5rem', backgroundColor: '#09090b', borderRadius: '6px', border: '1px solid #27272a', color: '#71717a', fontSize: '0.8125rem' }}>
-                        No jerseys currently linked to this vendor. Assign this vendor when adding or editing jerseys in the product form!
-                      </div>
-                    ) : (
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid #27272a', color: '#71717a', textAlign: 'left' }}>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Jersey</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Category</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Vendor Price</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Selling Price</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Current Stock</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Min Alert</th>
-                              <th style={{ padding: '0.75rem 0.5rem' }}>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {vendorProducts.map(p => {
-                              const stock = getProductTotalStock(p);
-                              const minAlert = p.minStockAlert !== undefined ? p.minStockAlert : 5;
-                              const isLow = stock <= minAlert;
-
-                              return (
-                                <tr key={p.id} style={{ borderBottom: '1px solid #27272a' }}>
-                                  <td style={{ padding: '0.75rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <img src={p.images?.[0] || '/images/placeholder-jersey.jpg'} alt="" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', backgroundColor: '#09090b' }} />
-                                    <div>
-                                      <strong style={{ color: '#fff', display: 'block' }}>{p.name}</strong>
-                                      <span style={{ fontSize: '0.6875rem', color: '#71717a' }}>
-                                        {p.primaryColor}{p.secondaryColor ? ` / ${p.secondaryColor}` : ''}
+                                return (
+                                  <tr key={p.id} style={{ borderBottom: '1px solid #27272a' }}>
+                                    <td style={{ padding: '0.75rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                      <img src={p.images?.[0] || '/images/placeholder-jersey.jpg'} alt="" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', backgroundColor: '#09090b' }} />
+                                      <div>
+                                        <strong style={{ color: '#fff', display: 'block' }}>{p.name}</strong>
+                                        <span style={{ fontSize: '0.6875rem', color: '#71717a' }}>
+                                          {p.primaryColor}{p.secondaryColor ? ` / ${p.secondaryColor}` : ''}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td style={{ padding: '0.75rem 0.5rem', color: '#a1a1aa' }}>{p.category}</td>
+                                    <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>₹{p.vendorPrice || 'N/A'}</td>
+                                    <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>₹{p.price}</td>
+                                    <td style={{ padding: '0.75rem 0.5rem', color: '#a1a1aa', fontSize: '0.75rem' }}>
+                                      {Object.entries(p.stock_per_size || {}).map(([sz, qty]) => `${sz}:${qty}`).join(' • ')}
+                                    </td>
+                                    <td style={{ padding: '0.75rem 0.5rem' }}>
+                                      <span style={{ color: isLow ? '#facc15' : '#fff', fontWeight: isLow ? 800 : 400 }}>
+                                        {stock} units
                                       </span>
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '0.75rem 0.5rem', color: '#a1a1aa' }}>{p.category}</td>
-                                  <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>₹{p.vendorPrice || 'N/A'}</td>
-                                  <td style={{ padding: '0.75rem 0.5rem', color: '#fff' }}>₹{p.price}</td>
-                                  <td style={{ padding: '0.75rem 0.5rem' }}>
-                                    <span style={{ color: isLow ? '#facc15' : '#fff', fontWeight: isLow ? 800 : 400 }}>
-                                      {stock} units
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '0.75rem 0.5rem', color: '#a1a1aa' }}>
-                                    {minAlert} units
-                                  </td>
-                                  <td style={{ padding: '0.75rem 0.5rem' }}>
-                                    <button
-                                      onClick={() => handleEdit(p)}
-                                      style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem' }}
-                                    >
-                                      Edit
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem 0.5rem' }}>
+                                      <button
+                                        onClick={() => handleEdit(p)}
+                                        style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem' }}
+                                      >
+                                        Edit
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -2360,15 +2401,35 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.35rem' }}>Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. supplier@domain.com"
-                    value={vendorForm.email}
-                    onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
-                    style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '4px', padding: '0.625rem', color: '#fff', fontSize: '0.8125rem' }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.35rem' }}>Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. supplier@domain.com"
+                      value={vendorForm.email}
+                      onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '4px', padding: '0.625rem', color: '#fff', fontSize: '0.8125rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600, marginBottom: '0.35rem' }}>
+                      Min Order Qty (MOQ) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 10"
+                      value={vendorForm.min_order_quantity}
+                      onChange={(e) => setVendorForm({ ...vendorForm, min_order_quantity: parseInt(e.target.value, 10) || 0 })}
+                      required
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #f59e0b55', borderRadius: '4px', padding: '0.625rem', color: '#fff', fontSize: '0.8125rem' }}
+                    />
+                    <span style={{ fontSize: '0.65rem', color: '#71717a', marginTop: '0.2rem', display: 'block' }}>
+                      Alerts when total stock ≤ this
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>

@@ -387,7 +387,12 @@ export async function getVendors() {
       .order('name', { ascending: true });
 
     if (!error && Array.isArray(data)) {
-      const cleaned = data.filter(v => v.name !== 'Apex Jersey Manufacturers' && v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d');
+      const cleaned = data
+        .filter(v => v.name !== 'Apex Jersey Manufacturers' && v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d')
+        .map(v => ({
+          ...v,
+          min_order_quantity: v.min_order_quantity !== undefined && v.min_order_quantity !== null ? Number(v.min_order_quantity) : 10
+        }));
       if (typeof window !== 'undefined') {
         localStorage.setItem('jerseyhut_vendors', JSON.stringify(cleaned));
       }
@@ -403,6 +408,7 @@ export async function getVendors() {
 export async function createVendor(vendorData) {
   const payload = {
     name: vendorData.name.trim(),
+    min_order_quantity: vendorData.min_order_quantity !== undefined && vendorData.min_order_quantity !== '' ? Number(vendorData.min_order_quantity) : 10,
     contact_person: vendorData.contact_person || vendorData.contactPerson || null,
     phone: vendorData.phone || null,
     email: vendorData.email || null,
@@ -439,6 +445,7 @@ export async function createVendor(vendorData) {
 export async function updateVendor(id, vendorData) {
   const payload = {
     name: vendorData.name.trim(),
+    min_order_quantity: vendorData.min_order_quantity !== undefined && vendorData.min_order_quantity !== '' ? Number(vendorData.min_order_quantity) : 10,
     contact_person: vendorData.contact_person || vendorData.contactPerson || null,
     phone: vendorData.phone || null,
     email: vendorData.email || null,
@@ -471,6 +478,41 @@ export async function updateVendor(id, vendorData) {
   }
 
   return data;
+}
+
+/**
+ * Decrements stock_per_size for purchased items
+ * items: array of { product: { id }, size: string, quantity: number }
+ */
+export async function decrementProductStock(items) {
+  if (!items || items.length === 0 || !supabase) return;
+  for (const item of items) {
+    try {
+      const pId = item.product?.id || item.id;
+      const size = item.size || 'M';
+      const qty = item.quantity || 1;
+      if (!pId) continue;
+
+      const { data: prod, error } = await supabase
+        .from('products')
+        .select('stock_per_size')
+        .eq('id', pId)
+        .single();
+
+      if (!error && prod && prod.stock_per_size) {
+        const currentStock = { ...prod.stock_per_size };
+        const currentQty = Number(currentStock[size]) || 0;
+        currentStock[size] = Math.max(0, currentQty - qty);
+
+        await supabase
+          .from('products')
+          .update({ stock_per_size: currentStock, updated_at: new Date().toISOString() })
+          .eq('id', pId);
+      }
+    } catch (e) {
+      console.warn('Failed to decrement product stock:', e);
+    }
+  }
 }
 
 export async function deleteVendor(id) {

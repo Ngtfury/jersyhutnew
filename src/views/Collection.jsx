@@ -94,6 +94,7 @@ export default function Collection({ categorySlug }) {
     { id: 'HOME', label: 'Home Kit' },
     { id: 'AWAY', label: 'Away Kit' },
     { id: 'THIRD', label: 'Third Kit' },
+    { id: 'FOURTH', label: 'Fourth Kit' },
     { id: 'SPECIAL', label: 'Special Edition' },
   ], []);
 
@@ -128,7 +129,7 @@ export default function Collection({ categorySlug }) {
 
     // If specific kit type is active:
     if (filterKitType !== 'all') {
-      const label = filterKitType === 'HOME' ? 'HOME KITS' : filterKitType === 'AWAY' ? 'AWAY KITS' : `${filterKitType.toUpperCase()} KITS`;
+      const label = filterKitType === 'HOME' ? 'HOME KITS' : filterKitType === 'AWAY' ? 'AWAY KITS' : filterKitType === 'THIRD' ? 'THIRD KITS' : filterKitType === 'FOURTH' ? 'FOURTH KITS' : `${filterKitType.toUpperCase()} KITS`;
       return {
         title: label,
         categoryName: isAll ? 'ALL' : categorySlug.replace(/-/g, ' ').toUpperCase(),
@@ -230,6 +231,7 @@ export default function Collection({ categorySlug }) {
         if (target === 'HOME') return kt.includes('HOME') || (!kt && p.name?.toLowerCase().includes('home'));
         if (target === 'AWAY') return kt.includes('AWAY') || (!kt && p.name?.toLowerCase().includes('away'));
         if (target === 'THIRD') return kt.includes('THIRD') || (!kt && p.name?.toLowerCase().includes('third'));
+        if (target === 'FOURTH') return kt.includes('FOURTH') || (!kt && p.name?.toLowerCase().includes('fourth'));
         if (target === 'SPECIAL') return kt.includes('SPECIAL') || (!kt && p.name?.toLowerCase().includes('special'));
         return kt === target;
       });

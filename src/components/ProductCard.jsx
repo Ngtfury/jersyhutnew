@@ -35,7 +35,7 @@ export default function ProductCard({ product }) {
   const metaItems = [
     displayTeam,
     product.year,
-    product.kit_type === 'HOME' ? 'HOME' : product.kit_type === 'AWAY' ? 'AWAY' : product.kit_type
+    product.kit_type === 'HOME' ? 'HOME' : product.kit_type === 'AWAY' ? 'AWAY' : product.kit_type === 'THIRD' ? 'THIRD' : product.kit_type === 'FOURTH' ? 'FOURTH' : product.kit_type
   ].filter(Boolean);
 
   const mainImage = product.images?.[0] || '/images/placeholder-jersey.jpg';

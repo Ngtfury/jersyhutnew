@@ -83,12 +83,14 @@ export default function Product({ productId }) {
     if (raw.includes('HOME')) return { label: 'HOME KIT', param: 'HOME' };
     if (raw.includes('AWAY')) return { label: 'AWAY KIT', param: 'AWAY' };
     if (raw.includes('THIRD')) return { label: 'THIRD KIT', param: 'THIRD' };
+    if (raw.includes('FOURTH')) return { label: 'FOURTH KIT', param: 'FOURTH' };
     if (raw.includes('SPECIAL')) return { label: 'SPECIAL EDITION', param: 'SPECIAL' };
     
     // Fallback based on product name
     const n = (product?.name || '').toLowerCase();
     if (n.includes('away')) return { label: 'AWAY KIT', param: 'AWAY' };
     if (n.includes('third')) return { label: 'THIRD KIT', param: 'THIRD' };
+    if (n.includes('fourth')) return { label: 'FOURTH KIT', param: 'FOURTH' };
     return { label: 'HOME KIT', param: 'HOME' };
   }, [product]);
 
