@@ -15,7 +15,30 @@ export default function ProductCard({ product }) {
     addToCart(product, defaultSize, 1);
   };
 
+  const displayTeam = product.team?.trim() || product.country?.trim() || (() => {
+    const name = product.name || '';
+    const knownClubs = [
+      'Real Madrid', 'Barcelona', 'Barca', 'Manchester United', 'Man United',
+      'Manchester City', 'Man City', 'Arsenal', 'Chelsea', 'Liverpool',
+      'Bayern Munich', 'Bayern', 'PSG', 'Juventus', 'AC Milan', 'Inter Milan',
+      'Borussia Dortmund', 'Dortmund', 'Atletico Madrid', 'Tottenham', 'Ajax',
+      'Portugal', 'Argentina', 'Brazil', 'France', 'Germany', 'Spain', 'England'
+    ];
+    for (const club of knownClubs) {
+      if (new RegExp(`\\b${club}\\b`, 'i').test(name)) return club;
+    }
+    return null;
+  })();
+
   const hasSecondImage = product.images && product.images.length > 1;
+
+  const metaItems = [
+    displayTeam,
+    product.year,
+    product.kit_type === 'HOME' ? 'HOME' : product.kit_type === 'AWAY' ? 'AWAY' : product.kit_type
+  ].filter(Boolean);
+
+  const mainImage = product.images?.[0] || '/images/placeholder-jersey.jpg';
 
   return (
     <Link
@@ -29,7 +52,7 @@ export default function ProductCard({ product }) {
         )}
 
         <img
-          src={product.images[0]}
+          src={mainImage}
           alt={product.name}
           className="product-img"
           loading="lazy"
@@ -56,6 +79,11 @@ export default function ProductCard({ product }) {
       </div>
 
       <div className="product-info">
+        {metaItems.length > 0 && (
+          <span style={{ fontSize: '0.6875rem', color: '#71717a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+            {metaItems.join(' • ')}
+          </span>
+        )}
         <h3 className="product-title" title={product.name}>
           {product.name}
         </h3>

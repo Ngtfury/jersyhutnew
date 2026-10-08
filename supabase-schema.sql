@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS public.products (
   images TEXT[] DEFAULT ARRAY[]::text[],
   player TEXT,
   team TEXT,
+  year TEXT,
+  version TEXT, -- EMBROIDERY / SUBLIMATION / MASTER QUALITY / PLAYER VERSION
+  kit_type TEXT, -- HOME / AWAY / THIRD / SPECIAL
   country TEXT,
   edition TEXT,
   material TEXT,
@@ -63,15 +66,24 @@ CREATE TABLE IF NOT EXISTS public.products (
 );
 
 -- In case tables were previously created without these columns, alter them safely:
+-- (Safe non-destructive production migrations)
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS primary_color TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS secondary_color TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id) ON DELETE SET NULL;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS vendor_price NUMERIC;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS min_stock_alert INTEGER DEFAULT 5;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_best_seller BOOLEAN DEFAULT false;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS year TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS team TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS version TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS kit_type TEXT;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products (category);
+CREATE INDEX IF NOT EXISTS idx_products_team ON public.products (team);
+CREATE INDEX IF NOT EXISTS idx_products_year ON public.products (year);
+CREATE INDEX IF NOT EXISTS idx_products_version ON public.products (version);
+CREATE INDEX IF NOT EXISTS idx_products_kit_type ON public.products (kit_type);
 CREATE INDEX IF NOT EXISTS idx_products_vendor_id ON public.products (vendor_id);
 CREATE INDEX IF NOT EXISTS idx_products_is_best_seller ON public.products (is_best_seller);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products (created_at DESC);

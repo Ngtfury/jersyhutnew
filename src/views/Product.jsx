@@ -17,7 +17,10 @@ import {
   ChevronDown,
   ChevronUp,
   Share2,
-  Check
+  Check,
+  Shield,
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 
 export default function Product({ productId }) {
@@ -44,6 +47,55 @@ export default function Product({ productId }) {
   const product = useMemo(() => {
     return allProducts.find(p => p.id === productId) || null;
   }, [allProducts, productId]);
+
+  // Ensure Team is ALWAYS present (smart extraction fallback so it never displays N/A)
+  const displayTeam = useMemo(() => {
+    if (product?.team && product.team.trim()) return product.team.trim();
+    if (product?.country && product.country.trim()) return product.country.trim();
+    const name = product?.name || '';
+    const knownClubs = [
+      'Real Madrid', 'Barcelona', 'Barca', 'Manchester United', 'Man United',
+      'Manchester City', 'Man City', 'Arsenal', 'Chelsea', 'Liverpool',
+      'Bayern Munich', 'Bayern', 'PSG', 'Paris Saint-Germain', 'Juventus',
+      'AC Milan', 'Inter Milan', 'Inter', 'Borussia Dortmund', 'Dortmund',
+      'Atletico Madrid', 'Tottenham', 'Spurs', 'Ajax', 'Portugal', 'Argentina',
+      'Brazil', 'France', 'Germany', 'Spain', 'England', 'Italy', 'Japan',
+      'Netherlands', 'India', 'Al Nassr', 'Inter Miami'
+    ];
+    for (const club of knownClubs) {
+      if (new RegExp(`\\b${club}\\b`, 'i').test(name)) {
+        return club;
+      }
+    }
+    return 'Official Club Edition';
+  }, [product]);
+
+  // Ensure Year is formatted
+  const displayYear = useMemo(() => {
+    if (product?.year && product.year.trim()) return product.year.trim();
+    const match = product?.name?.match(/\b(19\d\d|20\d\d(-\d{2})?)\b/);
+    return match ? match[0] : '2025-26';
+  }, [product]);
+
+  // Ensure Kit Type (Home/Away) is formatted
+  const kitInfo = useMemo(() => {
+    const raw = (product?.kit_type || product?.kitType || '').toUpperCase();
+    if (raw.includes('HOME')) return { label: 'HOME KIT', param: 'HOME' };
+    if (raw.includes('AWAY')) return { label: 'AWAY KIT', param: 'AWAY' };
+    if (raw.includes('THIRD')) return { label: 'THIRD KIT', param: 'THIRD' };
+    if (raw.includes('SPECIAL')) return { label: 'SPECIAL EDITION', param: 'SPECIAL' };
+    
+    // Fallback based on product name
+    const n = (product?.name || '').toLowerCase();
+    if (n.includes('away')) return { label: 'AWAY KIT', param: 'AWAY' };
+    if (n.includes('third')) return { label: 'THIRD KIT', param: 'THIRD' };
+    return { label: 'HOME KIT', param: 'HOME' };
+  }, [product]);
+
+  // Ensure Quality / Version is formatted
+  const displayVersion = useMemo(() => {
+    return product?.version || 'MASTER QUALITY';
+  }, [product]);
 
   const discountPercent = useMemo(() => {
     if (!product) return null;
@@ -194,6 +246,92 @@ export default function Product({ productId }) {
             <h1 className="heading-section" style={{ fontSize: 'clamp(1.5rem, 2.8vw, 2.2rem)', lineHeight: 1.15 }}>
               {product.name}
             </h1>
+
+            {/* Jersey Specs Hyperlink Badges */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginTop: '-0.75rem' }}>
+              <Link
+                href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '4px 10px',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  textDecoration: 'none',
+                  borderRadius: '3px'
+                }}
+                title={`Explore all ${displayTeam} jerseys`}
+              >
+                <Shield size={11} color="#38bdf8" /> {displayTeam}
+              </Link>
+
+              <Link
+                href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '4px 10px',
+                  backgroundColor: '#f4f4f5',
+                  color: '#18181b',
+                  border: '1px solid #e4e4e7',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  textDecoration: 'none',
+                  borderRadius: '3px'
+                }}
+                title={`Explore all ${displayYear} kits`}
+              >
+                <Calendar size={11} /> {displayYear}
+              </Link>
+
+              <Link
+                href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '4px 10px',
+                  backgroundColor: '#f4f4f5',
+                  color: '#18181b',
+                  border: '1px solid #e4e4e7',
+                  textDecoration: 'none',
+                  borderRadius: '3px'
+                }}
+                title={`Explore all ${kitInfo.label}s`}
+              >
+                {kitInfo.label}
+              </Link>
+
+              <Link
+                href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '4px 10px',
+                  backgroundColor: '#e5ff00',
+                  color: '#000000',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  textDecoration: 'none',
+                  borderRadius: '3px'
+                }}
+                title={`Explore all ${displayVersion} jerseys`}
+              >
+                <Sparkles size={11} /> {displayVersion}
+              </Link>
+            </div>
 
             {/* Pricing & Savings */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -384,16 +522,185 @@ export default function Product({ productId }) {
                 </button>
 
                 {openAccordion === 'details' && (
-                  <div style={{ paddingBottom: '1.25rem', fontSize: '0.8rem', color: '#444', lineHeight: 1.6 }}>
-                    <p style={{ marginBottom: '1rem' }}>
-                      {product.description}
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.4rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                  <div style={{ paddingBottom: '1.25rem', fontSize: '0.8125rem', color: '#444', lineHeight: 1.6 }}>
+                    
+                    {/* 1. Main Description Paragraph & Contextual Hyperlinks */}
+                    <div style={{ marginBottom: '1.25rem', lineHeight: 1.75 }}>
+                      {product.description && (
+                        <p style={{ marginBottom: '0.85rem', color: '#27272a' }}>
+                          {product.description}
+                        </p>
+                      )}
+
+                      {/* Styled contextual paragraph with direct hyperlinks */}
+                      <div style={{
+                        padding: '0.85rem 1rem',
+                        backgroundColor: '#f9fafb',
+                        borderLeft: '3px solid #000',
+                        borderRadius: '0 4px 4px 0',
+                        fontSize: '0.8125rem',
+                        color: '#374151'
+                      }}>
+                        Official matchday specification{' '}
+                        <Link
+                          href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
+                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
+                        >
+                          {kitInfo.label}
+                        </Link>{' '}
+                        for{' '}
+                        <Link
+                          href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
+                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
+                        >
+                          {displayTeam}
+                        </Link>{' '}
+                        ({' '}
+                        <Link
+                          href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
+                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
+                        >
+                          {displayYear}
+                        </Link>{' '}
+                        Season), tailored in premium{' '}
+                        <Link
+                          href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
+                          style={{ fontWeight: 700, color: '#000', backgroundColor: '#e5ff00', padding: '1px 5px', textDecoration: 'underline' }}
+                        >
+                          {displayVersion}
+                        </Link>{' '}
+                        construction.
+                      </div>
+                    </div>
+
+                    {/* 2. Interactive Hyperlink Spec Cards */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: '0.65rem',
+                      marginBottom: '1.5rem',
+                      backgroundColor: '#f4f4f5',
+                      padding: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e4e4e7'
+                    }}>
+                      <Link
+                        href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Team / Club
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {displayTeam} <ArrowRight size={12} />
+                        </span>
+                      </Link>
+
+                      <Link
+                        href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Season / Year
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {displayYear} <ArrowRight size={12} />
+                        </span>
+                      </Link>
+
+                      <Link
+                        href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Kit Type
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {kitInfo.label} <ArrowRight size={12} />
+                        </span>
+                      </Link>
+
+                      <Link
+                        href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Quality / Craft
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {displayVersion} <ArrowRight size={12} />
+                        </span>
+                      </Link>
+                    </div>
+
+                    {/* 3. Technical Specs Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.5rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                       <span style={{ color: '#888' }}>PLAYER:</span>
                       <strong style={{ color: '#000' }}>{product.player || 'N/A'}</strong>
 
-                      <span style={{ color: '#888' }}>CLUB / COUNTRY:</span>
-                      <strong style={{ color: '#000' }}>{product.team || product.country || 'N/A'}</strong>
+                      <span style={{ color: '#888' }}>CLUB / TEAM:</span>
+                      <Link
+                        href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
+                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {displayTeam}
+                      </Link>
+
+                      <span style={{ color: '#888' }}>SEASON / YEAR:</span>
+                      <Link
+                        href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
+                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {displayYear}
+                      </Link>
+
+                      <span style={{ color: '#888' }}>KIT TYPE:</span>
+                      <Link
+                        href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
+                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {kitInfo.label}
+                      </Link>
+
+                      <span style={{ color: '#888' }}>QUALITY / VERSION:</span>
+                      <Link
+                        href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
+                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {displayVersion}
+                      </Link>
 
                       <span style={{ color: '#888' }}>EDITION:</span>
                       <strong style={{ color: '#000' }}>{product.edition || 'CLASSIC MATCHDAY'}</strong>

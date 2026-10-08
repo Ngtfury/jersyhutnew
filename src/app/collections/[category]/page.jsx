@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Collection from '../../../views/Collection';
 
 export async function generateMetadata({ params }) {
@@ -22,5 +23,10 @@ export async function generateStaticParams() {
 
 export default async function CollectionPage({ params }) {
   const resolvedParams = await params;
-  return <Collection categorySlug={resolvedParams.category} />;
+  return (
+    <Suspense fallback={<div style={{ minHeight: '80vh', padding: '4rem 0', textAlign: 'center' }}>Loading collection...</div>}>
+      <Collection categorySlug={resolvedParams.category} />
+    </Suspense>
+  );
 }
+

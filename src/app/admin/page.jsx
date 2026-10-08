@@ -30,7 +30,9 @@ import {
   DollarSign,
   TrendingUp,
   Tag,
-  Palette
+  Palette,
+  Shield,
+  Calendar
 } from 'lucide-react';
 import { 
   getProducts, 
@@ -57,6 +59,28 @@ import {
   DEFAULT_VENDORS
 } from '../../lib/supabase';
 import { PRODUCTS as LOCAL_PRODUCTS } from '../../data/products';
+
+export const JERSEY_VERSIONS = [
+  'MASTER QUALITY',
+  'PLAYER VERSION',
+  'SUBLIMATION',
+  'EMBROIDERY'
+];
+
+export const KIT_TYPES = [
+  { id: 'HOME', label: 'Home Kit' },
+  { id: 'AWAY', label: 'Away Kit' },
+  { id: 'THIRD', label: 'Third Kit' },
+  { id: 'SPECIAL', label: 'Special Edition' }
+];
+
+export const COMMON_SEASONS = [
+  '2026',
+  '2025-26',
+  '2024-25',
+  '2023-24',
+  'Retro / Classic'
+];
 
 const SIZES = ['S', 'M', 'L', 'XL', '2XL'];
 
@@ -137,6 +161,9 @@ export default function AdminPage() {
     images: [],
     player: '',
     team: '',
+    year: '2025-26',
+    version: 'MASTER QUALITY',
+    kit_type: 'HOME',
     country: '',
     edition: '',
     material: 'DOTKNIT AERO-COOL',
@@ -149,6 +176,8 @@ export default function AdminPage() {
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [customTeams, setCustomTeams] = useState([]);
+  const [isNewTeamMode, setIsNewTeamMode] = useState(false);
   const fileInputRef = useRef(null);
 
   // Load all products, categories, vendors & site banners
@@ -191,7 +220,23 @@ export default function AdminPage() {
   useEffect(() => {
     setMounted(true);
     loadData();
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('jerseyhut_custom_teams');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setCustomTeams(parsed);
+        }
+      } catch (e) {}
+    }
   }, []);
+
+  // Compute all available unique teams from existing products + custom added teams
+  const availableTeams = React.useMemo(() => {
+    const fromProducts = products.map(p => p.team?.trim()).filter(Boolean);
+    const combined = Array.from(new Set([...fromProducts, ...customTeams])).sort((a, b) => a.localeCompare(b));
+    return combined;
+  }, [products, customTeams]);
 
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
@@ -268,6 +313,25 @@ export default function AdminPage() {
   // Switch to edit product
   const handleEdit = (product) => {
     setEditingId(product.id);
+    let productTeam = product.team || '';
+    if (!productTeam) {
+      const name = product.name || '';
+      const knownClubs = [
+        'Real Madrid', 'Barcelona', 'Barca', 'Manchester United', 'Man United',
+        'Manchester City', 'Man City', 'Arsenal', 'Chelsea', 'Liverpool',
+        'Bayern Munich', 'Bayern', 'PSG', 'Juventus', 'AC Milan', 'Inter Milan',
+        'Borussia Dortmund', 'Dortmund', 'Atletico Madrid', 'Tottenham', 'Ajax',
+        'Portugal', 'Argentina', 'Brazil', 'France', 'Germany', 'Spain', 'England'
+      ];
+      for (const club of knownClubs) {
+        if (new RegExp(`\\b${club}\\b`, 'i').test(name)) {
+          productTeam = club;
+          break;
+        }
+      }
+      if (!productTeam && product.country) productTeam = product.country;
+    }
+
     setFormData({
       name: product.name,
       price: product.price,
@@ -280,7 +344,10 @@ export default function AdminPage() {
       active_sizes: product.sizes || ['S', 'M', 'L', 'XL', '2XL'],
       images: product.images || [],
       player: product.player || '',
-      team: product.team || '',
+      team: productTeam,
+      year: product.year || '',
+      version: product.version || 'MASTER QUALITY',
+      kit_type: product.kit_type || product.kitType || 'HOME',
       country: product.country || '',
       edition: product.edition || '',
       material: product.material || '',
@@ -291,6 +358,7 @@ export default function AdminPage() {
       vendorPrice: product.vendorPrice !== undefined && product.vendorPrice !== null ? product.vendorPrice : '',
       minStockAlert: product.minStockAlert !== undefined && product.minStockAlert !== null ? product.minStockAlert : 5
     });
+    setIsNewTeamMode(false);
     setActiveTab('add');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -299,6 +367,7 @@ export default function AdminPage() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setFormData(initialFormState);
+    setIsNewTeamMode(false);
     setActiveTab('manage');
   };
 
@@ -323,6 +392,10 @@ export default function AdminPage() {
     e.preventDefault();
     if (!formData.name.trim()) {
       showToast('Please enter a product name', 'error');
+      return;
+    }
+    if (!formData.team || !formData.team.trim()) {
+      showToast('Please specify a Team / Club name (Team is required)', 'error');
       return;
     }
     if (!formData.price) {
@@ -361,8 +434,20 @@ export default function AdminPage() {
         showToast('Product added successfully!');
       }
 
+      if (formData.team?.trim()) {
+        const trimmed = formData.team.trim();
+        if (!customTeams.includes(trimmed)) {
+          const next = [...customTeams, trimmed];
+          setCustomTeams(next);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('jerseyhut_custom_teams', JSON.stringify(next));
+          }
+        }
+      }
+
       setFormData(initialFormState);
       setEditingId(null);
+      setIsNewTeamMode(false);
       setActiveTab('manage');
     } catch (err) {
       console.error('Save failed:', err);
@@ -570,9 +655,15 @@ export default function AdminPage() {
 
   // Filtered products list for inventory
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.player?.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch = !q ||
+                          p.name?.toLowerCase().includes(q) ||
+                          p.category?.toLowerCase().includes(q) ||
+                          p.player?.toLowerCase().includes(q) ||
+                          p.team?.toLowerCase().includes(q) ||
+                          p.year?.toLowerCase().includes(q) ||
+                          p.version?.toLowerCase().includes(q) ||
+                          p.kit_type?.toLowerCase().includes(q);
     const matchesCat = filterCategory === 'ALL' || p.category === filterCategory;
     const matchesVendor = filterVendor === 'ALL' || p.vendorId === filterVendor;
     return matchesSearch && matchesCat && matchesVendor;
@@ -906,8 +997,35 @@ export default function AdminPage() {
                           {product.name}
                         </h4>
 
-                        {/* Colors & Vendor tags */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.6875rem' }}>
+                        {/* Team, Year, Kit Type, Version chips */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', marginBottom: '0.6rem', fontSize: '0.6875rem' }}>
+                          {product.team && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#fff', backgroundColor: '#27272a', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>
+                              <Shield size={10} color="#38bdf8" />
+                              {product.team}
+                            </span>
+                          )}
+
+                          {product.year && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#d4d4d8', backgroundColor: '#1f2937', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                              <Calendar size={10} />
+                              {product.year}
+                            </span>
+                          )}
+
+                          {product.kit_type && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#fef08a', backgroundColor: 'rgba(234, 179, 8, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                              {product.kit_type === 'HOME' ? 'HOME' : product.kit_type === 'AWAY' ? 'AWAY' : product.kit_type}
+                            </span>
+                          )}
+
+                          {product.version && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#67e8f9', backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                              <Sparkles size={9} />
+                              {product.version}
+                            </span>
+                          )}
+
                           {(product.primaryColor || product.secondaryColor) && (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#d4d4d8', backgroundColor: '#27272a', padding: '2px 6px', borderRadius: '4px' }}>
                               <Palette size={10} />
@@ -1130,6 +1248,213 @@ export default function AdminPage() {
                     </span>
                   </div>
                 )}
+              </div>
+
+              {/* JERSEY SPECIFICATIONS: TEAM, YEAR, KIT TYPE, QUALITY/VERSION */}
+              <div style={{ marginBottom: '1.75rem', backgroundColor: '#09090b', padding: '1.25rem', borderRadius: '8px', border: '1px solid #27272a' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid #27272a', paddingBottom: '0.75rem' }}>
+                  <Shield size={16} color="#38bdf8" />
+                  <span style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fff' }}>
+                    Jersey Specifications (Team, Year, Kit Type & Quality)
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                  {/* TEAM / CLUB SELECTION */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa' }}>
+                        Team / Club Name * <span style={{ color: '#ef4444' }}>(Required)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewTeamMode(!isNewTeamMode);
+                          if (!isNewTeamMode) {
+                            setFormData(prev => ({ ...prev, team: '' }));
+                          }
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {isNewTeamMode ? '← Choose from Existing Teams' : '+ Type New Team'}
+                      </button>
+                    </div>
+
+                    {!isNewTeamMode ? (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <select
+                          value={formData.team}
+                          onChange={(e) => {
+                            if (e.target.value === '__NEW_TEAM__') {
+                              setIsNewTeamMode(true);
+                              setFormData({ ...formData, team: '' });
+                            } else {
+                              setFormData({ ...formData, team: e.target.value });
+                            }
+                          }}
+                          style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '0.625rem 0.75rem', color: '#fff', fontSize: '0.875rem', outline: 'none', cursor: 'pointer' }}
+                        >
+                          <option value="">-- Select Team / Club --</option>
+                          {formData.team && !availableTeams.includes(formData.team) && (
+                            <option value={formData.team}>{formData.team}</option>
+                          )}
+                          {availableTeams.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                          <option value="__NEW_TEAM__">+ Type New Team (e.g. Barca, PSG)...</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          type="text"
+                          placeholder="e.g. Barca, Real Madrid, Arsenal"
+                          value={formData.team}
+                          onChange={(e) => setFormData({ ...formData, team: e.target.value })}
+                          autoFocus
+                          style={{ flex: 1, backgroundColor: '#18181b', border: '1px solid #38bdf8', borderRadius: '6px', padding: '0.625rem 0.75rem', color: '#fff', fontSize: '0.875rem', outline: 'none' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsNewTeamMode(false)}
+                          style={{ backgroundColor: '#27272a', color: '#fff', border: 'none', padding: '0 0.75rem', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                    <span style={{ fontSize: '0.6875rem', color: '#71717a', marginTop: '0.35rem', display: 'block' }}>
+                      {isNewTeamMode 
+                        ? 'Type new team (e.g. Barca). Once saved, it will appear in the dropdown for all future jerseys.'
+                        : 'Select an existing team or click "+ Type New Team" to add a new one.'}
+                    </span>
+                  </div>
+
+                  {/* JERSEY YEAR / SEASON */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa', marginBottom: '0.4rem' }}>
+                      Jersey Year / Season *
+                    </label>
+                    <input
+                      type="text"
+                      list="common-seasons-list"
+                      placeholder="e.g. 2025-26, 2024, or 2008"
+                      value={formData.year}
+                      onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                      style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '0.625rem 0.75rem', color: '#fff', fontSize: '0.875rem', outline: 'none' }}
+                    />
+                    <datalist id="common-seasons-list">
+                      {COMMON_SEASONS.map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+
+                    {/* Quick year pills */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem' }}>
+                      {COMMON_SEASONS.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, year: s })}
+                          style={{
+                            fontSize: '0.65rem',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            border: formData.year === s ? '1px solid #fff' : '1px solid #27272a',
+                            backgroundColor: formData.year === s ? '#27272a' : 'transparent',
+                            color: formData.year === s ? '#fff' : '#71717a',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* KIT TYPE (HOME / AWAY / THIRD / SPECIAL) */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa', marginBottom: '0.4rem' }}>
+                    Kit Type (Home / Away) *
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                    {KIT_TYPES.map(k => {
+                      const isSelected = formData.kit_type === k.id;
+                      return (
+                        <button
+                          key={k.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, kit_type: k.id })}
+                          style={{
+                            padding: '0.625rem 0.75rem',
+                            borderRadius: '6px',
+                            border: isSelected ? '1px solid #ffffff' : '1px solid #27272a',
+                            backgroundColor: isSelected ? '#ffffff' : '#18181b',
+                            color: isSelected ? '#000000' : '#d4d4d8',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isSelected && <Check size={12} />}
+                          {k.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* JERSEY VERSION / QUALITY OPTION */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#a1a1aa' }}>
+                      Jersey Quality / Version *
+                    </label>
+                    <span style={{ fontSize: '0.6875rem', color: '#38bdf8', fontWeight: 600 }}>
+                      Selected: {formData.version || 'MASTER QUALITY'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem' }}>
+                    {JERSEY_VERSIONS.map(ver => {
+                      const isSelected = formData.version === ver;
+                      return (
+                        <button
+                          key={ver}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, version: ver })}
+                          style={{
+                            padding: '0.625rem 0.75rem',
+                            borderRadius: '6px',
+                            border: isSelected ? '1px solid #38bdf8' : '1px solid #27272a',
+                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : '#18181b',
+                            color: isSelected ? '#38bdf8' : '#d4d4d8',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isSelected && <Sparkles size={12} />}
+                          {ver}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* VENDOR & INVENTORY PURCHASING SECTION */}
@@ -1364,12 +1689,12 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.25rem' }}>Team / Club</label>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.25rem' }}>Country / Nation</label>
                     <input
                       type="text"
-                      placeholder="e.g. FRANCE"
-                      value={formData.team}
-                      onChange={(e) => setFormData({ ...formData, team: e.target.value })}
+                      placeholder="e.g. SPAIN or FRANCE"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                       style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '4px', padding: '0.5rem', color: '#fff', fontSize: '0.8125rem' }}
                     />
                   </div>
