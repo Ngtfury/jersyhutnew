@@ -9,7 +9,7 @@ export default function EditorialBanner() {
     <section className="editorial-banner-section" aria-label="Editorial Campaign Banner">
       <img
         src="/images/editorial-banner.jpg"
-        alt="Jersey Hut Football Heritage"
+        alt="Matchday Football Heritage"
         className="editorial-banner-img"
         loading="lazy"
       />

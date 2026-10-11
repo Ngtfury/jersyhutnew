@@ -14,7 +14,7 @@ export default function Footer() {
               href="/" 
               className="footer-logo"
             >
-              JERSEY HUT
+              MATCHDAY
             </Link>
             <p className="footer-tagline">
               High-quality, affordable football jerseys for every fan. Engineered for matchday glory and modern streetwear expression.
@@ -54,7 +54,7 @@ export default function Footer() {
                 <a href="#track" onClick={(e) => { e.preventDefault(); alert("Order tracking: Please enter your Order ID received via WhatsApp / SMS."); }} className="footer-link">Track Order</a>
               </li>
               <li>
-                <a href="#contact" onClick={(e) => { e.preventDefault(); alert("Contact us: support@jerseyhut.in | WhatsApp: +91 98765 43210"); }} className="footer-link">Contact Us</a>
+                <a href="#contact" onClick={(e) => { e.preventDefault(); alert("Contact us: support@matchday.in | WhatsApp: +91 98765 43210"); }} className="footer-link">Contact Us</a>
               </li>
               <li>
                 <a href="#faq" onClick={(e) => { e.preventDefault(); alert("FAQs: Delivery takes 3-5 business days across India. 7-day returns guaranteed."); }} className="footer-link">FAQs</a>
@@ -83,7 +83,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p>© 2026 JERSEY HUT. ALL RIGHTS RESERVED.</p>
+          <p>© 2026 MATCHDAY. ALL RIGHTS RESERVED.</p>
           <div className="payment-methods">
             <span className="payment-pill">UPI</span>
             <span className="payment-pill">CARDS</span>

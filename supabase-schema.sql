@@ -1,5 +1,5 @@
 -- ===================================================================
--- JERSEY HUT — COMPLETE SUPABASE DATABASE SCHEMA
+-- MATCHDAY — COMPLETE SUPABASE DATABASE SCHEMA
 -- Compatible with PostgreSQL 14+ / Supabase 2024-2026
 -- ===================================================================
 
@@ -270,7 +270,7 @@ VALUES
     'hero',
     E'ROAD\nTO\nGLORY',
     'FOOTBALL. CULTURE. IDENTITY.',
-    'JERSEY HUT',
+    'MATCHDAY',
     '/images/hero.jpg',
     '/collections/half-sleeves',
     'Main homepage hero editorial banner',

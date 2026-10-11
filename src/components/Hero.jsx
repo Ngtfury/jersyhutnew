@@ -19,7 +19,7 @@ export default function Hero() {
       <div className="hero-background-wrapper">
         <img
           src={banner.image_url || '/images/hero.jpg'}
-          alt={banner.title || "Jersey Hut Football Fashion Campaign"}
+          alt={banner.title || "Matchday Football Fashion Campaign"}
           className="hero-image"
           fetchPriority="high"
         />
@@ -29,7 +29,7 @@ export default function Hero() {
       <div className="hero-content">
         <div className="hero-text-block">
           <div className="hero-brand-tag">
-            <span>{banner.brand_tag || 'JERSEY HUT'}</span>
+            <span>{banner.brand_tag || 'MATCHDAY'}</span>
             <span style={{ width: 6, height: 6, backgroundColor: '#e5ff00' }}></span>
             <span>{banner.season_tag || 'SEASON 2026'}</span>
           </div>

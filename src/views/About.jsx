@@ -17,13 +17,13 @@ export default function About() {
 
         {/* Hero Editorial Header */}
         <div style={{ maxWidth: '820px', marginBottom: '4.5rem' }}>
-          <span className="heading-sub">JERSEY HUT MANIFESTO</span>
+          <span className="heading-sub">MATCHDAY MANIFESTO</span>
           <h1 className="heading-display" style={{ marginTop: '0.8rem', marginBottom: '1.5rem' }}>
             THE GAME IS MORE<br />
             THAN 90 MINUTES.
           </h1>
           <p style={{ fontSize: '1.1rem', lineHeight: 1.7, color: '#333' }}>
-            Jersey Hut is built for people who don’t just watch football — they live it. Every jersey represents a club, a player, a memory, a season, and a piece of football history.
+            Matchday is built for people who don’t just watch football — they live it. Every jersey represents a club, a player, a memory, a season, and a piece of football history.
           </p>
         </div>
 
@@ -38,7 +38,7 @@ export default function About() {
           <div style={{ width: '100%', aspectRatio: '4/5', backgroundColor: '#f0f0f0', overflow: 'hidden' }}>
             <img
               src="/images/hero.jpg"
-              alt="Jersey Hut Football Culture"
+              alt="Matchday Football Culture"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
@@ -48,7 +48,7 @@ export default function About() {
               BRIDGING THE PITCH & THE STREETS
             </h2>
             <p style={{ fontSize: '0.9rem', lineHeight: 1.8, color: '#555' }}>
-              Founded out of a deep reverence for the beautiful game, Jersey Hut bridges European football fashion with India’s vibrant streetwear revolution. We realized that true football fans were tired of inflated prices, low-grade knockoffs, and limited availability.
+              Founded out of a deep reverence for the beautiful game, Matchday bridges European football fashion with India’s vibrant streetwear revolution. We realized that true football fans were tired of inflated prices, low-grade knockoffs, and limited availability.
             </p>
             <p style={{ fontSize: '0.9rem', lineHeight: 1.8, color: '#555' }}>
               We obsessed over every detail: from sourcing high-density micro-dotknit polyester that wicks sweat during fierce summer five-a-side matches, to ensuring collar ribs and silicone crest badges withstand years of wear.
@@ -115,7 +115,7 @@ export default function About() {
                 COMMUNITY FIRST
               </h3>
               <p style={{ fontSize: '0.82rem', lineHeight: 1.6, color: '#666' }}>
-                From weekly screenings in Mumbai and Bengaluru to local tournament sponsorships, Jersey Hut reinvests in the grassroots heartbeat of Indian football.
+                From weekly screenings in Mumbai and Bengaluru to local tournament sponsorships, Matchday reinvests in the grassroots heartbeat of Indian football.
               </p>
             </div>
           </div>

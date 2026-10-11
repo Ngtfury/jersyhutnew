@@ -1,6 +1,6 @@
-# Jersey Hut — Editorial Football Jersey Store
+# Matchday — Editorial Football Jersey Store
 
-A high-performance, fashion-editorial ecommerce website for **Jersey Hut**, inspired by the minimalist luxury aesthetic, typography hierarchy, and layout rhythm of **Hillover**. Built natively with **Next.js 16 (App Router)** and optimized for **Vercel** deployment.
+A high-performance, fashion-editorial ecommerce website for **Matchday**, inspired by the minimalist luxury aesthetic, typography hierarchy, and layout rhythm of **Hillover**. Built natively with **Next.js 16 (App Router)** and optimized for **Vercel** deployment.
 
 ---
 

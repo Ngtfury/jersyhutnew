@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import Collection from '../../views/Collection';
 
 export const metadata = {
-  title: 'All Jerseys & Matchday Collections | Jersey Hut',
+  title: 'All Jerseys & Football Collections | Matchday',
   description: 'Shop authentic club jerseys, national team kits, retro football shirts, and lifestyle oversized tees.',
 };
 

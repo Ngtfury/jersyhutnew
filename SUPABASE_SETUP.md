@@ -1,4 +1,4 @@
-# Supabase Database & Storage Setup Guide — Jersey Hut
+# Supabase Database & Storage Setup Guide — Matchday
 
 Complete instructions to connect your **Supabase Database** and **Supabase Storage Bucket** for image uploads and manage products through the **/admin** dashboard.
 

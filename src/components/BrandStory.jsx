@@ -16,7 +16,7 @@ export default function BrandStory() {
               THAN 90 MINUTES.
             </h2>
             <p className="brand-story-text">
-              Jersey Hut is built for people who don’t just watch football — they live it.
+              Matchday is built for people who don’t just watch football — they live it.
               Every jersey represents a club, a player, a memory, an iconic season, and a living piece of football history.
             </p>
             <p className="brand-story-text" style={{ marginTop: '-0.5rem' }}>
@@ -27,7 +27,7 @@ export default function BrandStory() {
               className="btn-underline"
               id="brand-story-about-cta"
             >
-              ABOUT JERSEY HUT
+              ABOUT MATCHDAY
               <ArrowRight size={13} />
             </Link>
           </div>
@@ -35,7 +35,7 @@ export default function BrandStory() {
           <div className="brand-story-image-box">
             <img
               src="/images/category-half-sleeves.jpg"
-              alt="Jersey Hut Football Lifestyle"
+              alt="Matchday Football Lifestyle"
               className="brand-story-image"
               loading="lazy"
             />

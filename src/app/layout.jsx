@@ -7,10 +7,10 @@ import SearchOverlay from '../components/SearchOverlay';
 import Toast from '../components/Toast';
 
 export const metadata = {
-  title: 'Jersey Hut | Football Jerseys for Every Fan',
+  title: 'Matchday | Football Jerseys for Every Fan',
   description: 'High-quality, affordable football jerseys, full sleeves, half sleeves, and oversized streetwear collections. Fast shipping and secure checkout.',
   openGraph: {
-    title: 'Jersey Hut | Football Jerseys for Every Fan',
+    title: 'Matchday | Football Jerseys for Every Fan',
     description: 'High-quality, affordable football jerseys, full sleeves, half sleeves, and oversized streetwear collections.',
     type: 'website',
   },
@@ -47,7 +47,7 @@ export default function RootLayout({ children }) {
 
             {/* WhatsApp Floating Contact Button */}
             <a
-              href="https://wa.me/919876543210?text=Hi%20Jersey%20Hut,%20I%20have%20a%20question%20about%20a%20jersey"
+              href="https://wa.me/919876543210?text=Hi%20Matchday,%20I%20have%20a%20question%20about%20a%20jersey"
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -65,7 +65,7 @@ export default function RootLayout({ children }) {
                 zIndex: 90,
                 cursor: 'pointer'
               }}
-              aria-label="Contact Jersey Hut on WhatsApp"
+              aria-label="Contact Matchday on WhatsApp"
               id="whatsapp-chat-button"
             >
               <svg viewBox="0 0 24 24" width="26" height="26" fill="#ffffff">

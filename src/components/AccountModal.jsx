@@ -69,7 +69,7 @@ export default function AccountModal({ isOpen, onClose }) {
           <div>
             <div style={{ textAlign: 'center', marginBottom: '1.8rem' }}>
               <span style={{ fontSize: '0.7rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#666', fontWeight: 600 }}>
-                JERSEY HUT MEMBER ACCESS
+                MATCHDAY MEMBER ACCESS
               </span>
               <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '0.3rem' }}>
                 SIGN IN / REGISTER
@@ -125,7 +125,7 @@ export default function AccountModal({ isOpen, onClose }) {
                   {authMethod === 'phone' ? <Phone size={16} color="#888" /> : <Mail size={16} color="#888" />}
                   <input
                     type={authMethod === 'phone' ? 'tel' : 'email'}
-                    placeholder={authMethod === 'phone' ? '+91 98765 43210' : 'fan@jerseyhut.in'}
+                    placeholder={authMethod === 'phone' ? '+91 98765 43210' : 'fan@matchday.in'}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required

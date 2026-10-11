@@ -6,13 +6,13 @@ export async function generateMetadata({ params }) {
   const products = await getProducts();
   const product = products.find((p) => p.id === resolvedParams.id);
   if (!product) {
-    return { title: 'Product | Jersey Hut' };
+    return { title: 'Product | Matchday' };
   }
   return {
-    title: `${product.name} | Jersey Hut`,
+    title: `${product.name} | Matchday`,
     description: product.description,
     openGraph: {
-      title: `${product.name} | Jersey Hut`,
+      title: `${product.name} | Matchday`,
       description: product.description,
       images: product.images && product.images[0] ? [{ url: product.images[0] }] : [],
     },

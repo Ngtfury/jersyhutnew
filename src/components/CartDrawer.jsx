@@ -152,7 +152,7 @@ export default function CartDrawer({ onCheckout }) {
                 const itemsToOrder = [...cartItems];
                 decrementProductStock(itemsToOrder).catch(console.error);
                 closeCart();
-                onCheckout ? onCheckout() : alert("Thank you for choosing Jersey Hut! Routing to secure Indian UPI & Card Payment Gateway...");
+                onCheckout ? onCheckout() : alert("Thank you for choosing Matchday! Routing to secure Indian UPI & Card Payment Gateway...");
               }}
               className="btn btn-primary"
               style={{ width: '100%', padding: '1rem', marginTop: '0.4rem' }}

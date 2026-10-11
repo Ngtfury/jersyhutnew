@@ -6,8 +6,8 @@ export async function generateMetadata({ params }) {
   const category = resolvedParams.category || 'all';
   const formatted = category.replace(/-/g, ' ').toUpperCase();
   return {
-    title: `${formatted} | Jersey Hut`,
-    description: `Shop the official ${formatted} football jersey collection from Jersey Hut.`,
+    title: `${formatted} | Matchday`,
+    description: `Shop the official ${formatted} football jersey collection from Matchday.`,
   };
 }
 

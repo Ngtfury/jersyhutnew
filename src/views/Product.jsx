@@ -232,7 +232,7 @@ export default function Product({ productId }) {
             {/* Top Bar: Brand, Category, Share */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.75rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#666', fontWeight: 600 }}>
-                JERSEY HUT • {product.category}
+                MATCHDAY • {product.category}
               </span>
               <button
                 onClick={handleShare}

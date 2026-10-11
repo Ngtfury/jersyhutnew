@@ -184,7 +184,7 @@ export default function Collection({ categorySlug }) {
         return {
           title: formatted,
           categoryName: formatted,
-          description: `Curated ${formatted} edition kits from Jersey Hut.`
+          description: `Curated ${formatted} edition kits from Matchday.`
         };
       }
     }

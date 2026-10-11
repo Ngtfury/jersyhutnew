@@ -109,13 +109,13 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Desktop Left: JERSEY HUT Logo */}
+          {/* Desktop Left: MATCHDAY Logo */}
           <Link 
             href="/" 
             className="header-logo"
-            aria-label="Jersey Hut Home"
+            aria-label="Matchday Home"
           >
-            JERSEY HUT
+            MATCHDAY
             <span className="header-logo-accent"></span>
           </Link>
 
@@ -171,7 +171,7 @@ export default function Header() {
       <div className={`mobile-nav-panel ${mobileMenuOpen ? 'open' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <span className="header-logo" style={{ fontSize: '1.1rem' }}>
-            JERSEY HUT
+            MATCHDAY
           </span>
           <button 
             onClick={() => setMobileMenuOpen(false)}

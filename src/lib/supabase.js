@@ -542,7 +542,7 @@ export async function deleteVendor(id) {
 export const DEFAULT_HERO_BANNER = {
   id: 'hero',
   image_url: '/images/hero.jpg',
-  brand_tag: 'JERSEY HUT',
+  brand_tag: 'MATCHDAY',
   season_tag: 'SEASON 2026',
   title: 'ROAD\nTO\nGLORY',
   subtitle: 'FOOTBALL. CULTURE. IDENTITY.',
