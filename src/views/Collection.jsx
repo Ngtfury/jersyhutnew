@@ -26,6 +26,7 @@ export default function Collection({ categorySlug }) {
   const [filterYear, setFilterYear] = useState('all');
   const [filterKitType, setFilterKitType] = useState('all');
   const [filterVersion, setFilterVersion] = useState('all');
+  const [filterColor, setFilterColor] = useState('all');
 
   // Load products from Supabase
   useEffect(() => {
@@ -45,6 +46,8 @@ export default function Collection({ categorySlug }) {
     setFilterYear(searchParams.get('year') || 'all');
     setFilterKitType(searchParams.get('kit_type') || 'all');
     setFilterVersion(searchParams.get('version') || 'all');
+    setFilterPlayer(searchParams.get('player') || 'all');
+    setFilterColor(searchParams.get('color') || 'all');
   }, [searchParams]);
 
   // Helper to update URL search params
@@ -65,12 +68,16 @@ export default function Collection({ categorySlug }) {
     params.delete('year');
     params.delete('kit_type');
     params.delete('version');
+    params.delete('player');
+    params.delete('color');
     const query = params.toString() ? `?${params.toString()}` : '';
     router.push(`${pathname}${query}`, { scroll: false });
     setFilterTeam('all');
     setFilterYear('all');
     setFilterKitType('all');
     setFilterVersion('all');
+    setFilterPlayer('all');
+    setFilterColor('all');
   };
 
   // Derive unique spec options from current database products
@@ -146,6 +153,24 @@ export default function Collection({ categorySlug }) {
       };
     }
 
+    // If specific player filter is active:
+    if (filterPlayer !== 'all') {
+      return {
+        title: `${filterPlayer.toUpperCase()} JERSEYS & KITS`,
+        categoryName: isAll ? 'ALL' : categorySlug.replace(/-/g, ' ').toUpperCase(),
+        description: `Explore all matchday editions and iconic football shirts for ${filterPlayer}.`
+      };
+    }
+
+    // If specific color filter is active:
+    if (filterColor !== 'all') {
+      return {
+        title: `${filterColor.toUpperCase()} COLORWAY KITS`,
+        categoryName: isAll ? 'ALL' : categorySlug.replace(/-/g, ' ').toUpperCase(),
+        description: `Official football jerseys and lifestyle silhouettes featuring ${filterColor} color styling.`
+      };
+    }
+
     switch (categorySlug) {
       case 'full-sleeves':
         return {
@@ -194,12 +219,18 @@ export default function Collection({ categorySlug }) {
   const filteredProducts = useMemo(() => {
     const isAll = !categorySlug || categorySlug === 'all';
     let list = isAll ? [...allProducts] : allProducts.filter(p => {
-      if (collectionInfo.categoryName === 'OVERSIZED T') {
-        return p.category === 'OVERSIZED T' || p.category === 'OVERSIZED';
+      const itemCats = Array.isArray(p.categories) && p.categories.length > 0
+        ? p.categories
+        : [p.category, p.secondaryCategory].filter(Boolean);
+
+      const target = (collectionInfo.categoryName || '').toUpperCase();
+      if (target === 'OVERSIZED T' || target === 'OVERSIZED') {
+        return itemCats.some(c => {
+          const upper = (c || '').toUpperCase();
+          return upper === 'OVERSIZED T' || upper === 'OVERSIZED';
+        });
       }
-      return p.category === collectionInfo.categoryName || 
-             p.category?.toLowerCase() === collectionInfo.categoryName?.toLowerCase() ||
-             p.secondaryCategory === collectionInfo.categoryName;
+      return itemCats.some(c => (c || '').toUpperCase() === target);
     });
 
     // Team Filter
@@ -264,7 +295,24 @@ export default function Collection({ categorySlug }) {
 
     // Player Filter
     if (filterPlayer !== 'all') {
-      list = list.filter(p => p.player && p.player.toLowerCase().includes(filterPlayer.toLowerCase()));
+      const q = filterPlayer.toLowerCase().trim();
+      list = list.filter(p => {
+        const matchPlayer = p.player && p.player.toLowerCase().includes(q);
+        const matchName = p.name && p.name.toLowerCase().includes(q);
+        return matchPlayer || matchName;
+      });
+    }
+
+    // Color Filter
+    if (filterColor !== 'all') {
+      const q = filterColor.toLowerCase().trim();
+      list = list.filter(p => {
+        const pColor = (p.primaryColor || '').toLowerCase();
+        const sColor = (p.secondaryColor || '').toLowerCase();
+        const fullColor = (p.color || '').toLowerCase();
+        const name = (p.name || '').toLowerCase();
+        return pColor.includes(q) || sColor.includes(q) || fullColor.includes(q) || name.includes(q);
+      });
     }
 
     // Sort
@@ -278,7 +326,7 @@ export default function Collection({ categorySlug }) {
     }
 
     return sorted;
-  }, [allProducts, categorySlug, collectionInfo, filterTeam, filterYear, filterKitType, filterVersion, filterAvailability, filterPrice, filterPlayer, sortBy]);
+  }, [allProducts, categorySlug, collectionInfo, filterTeam, filterYear, filterKitType, filterVersion, filterAvailability, filterPrice, filterPlayer, filterColor, sortBy]);
 
   // Unique players in this collection
   const availablePlayers = useMemo(() => {
@@ -289,7 +337,7 @@ export default function Collection({ categorySlug }) {
     return Array.from(players);
   }, [allProducts]);
 
-  const hasActiveFilters = filterTeam !== 'all' || filterYear !== 'all' || filterKitType !== 'all' || filterVersion !== 'all';
+  const hasActiveFilters = filterTeam !== 'all' || filterYear !== 'all' || filterKitType !== 'all' || filterVersion !== 'all' || filterPlayer !== 'all' || filterColor !== 'all';
 
   const filterPillStyle = {
     display: 'inline-flex',
@@ -384,6 +432,26 @@ export default function Collection({ categorySlug }) {
                 title="Remove version filter"
               >
                 <Sparkles size={11} /> {filterVersion} <X size={12} />
+              </button>
+            )}
+
+            {filterPlayer !== 'all' && (
+              <button
+                onClick={() => { setFilterPlayer('all'); updateQueryParam('player', null); }}
+                style={filterPillStyle}
+                title="Remove player filter"
+              >
+                PLAYER: {filterPlayer} <X size={12} />
+              </button>
+            )}
+
+            {filterColor !== 'all' && (
+              <button
+                onClick={() => { setFilterColor('all'); updateQueryParam('color', null); }}
+                style={filterPillStyle}
+                title="Remove color filter"
+              >
+                COLOR: {filterColor} <X size={12} />
               </button>
             )}
 

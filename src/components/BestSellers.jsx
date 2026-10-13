@@ -40,10 +40,18 @@ export default function BestSellers() {
   const filteredProducts = useMemo(() => {
     if (!activeTab) return [];
     return allProducts.filter(p => {
-      if (activeTab === "OVERSIZED T") {
-        return p.category === "OVERSIZED T" || p.category === "OVERSIZED";
+      const itemCats = Array.isArray(p.categories) && p.categories.length > 0
+        ? p.categories
+        : [p.category, p.secondaryCategory].filter(Boolean);
+
+      const target = activeTab.toUpperCase();
+      if (target === "OVERSIZED T" || target === "OVERSIZED") {
+        return itemCats.some(c => {
+          const u = (c || '').toUpperCase();
+          return u === "OVERSIZED T" || u === "OVERSIZED";
+        });
       }
-      return p.category === activeTab || p.category?.toUpperCase() === activeTab?.toUpperCase();
+      return itemCats.some(c => (c || '').toUpperCase() === target);
     });
   }, [activeTab, allProducts]);
 

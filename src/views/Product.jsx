@@ -99,6 +99,37 @@ export default function Product({ productId }) {
     return product?.version || 'MASTER QUALITY';
   }, [product]);
 
+  // Derived display player and color
+  const displayPlayer = useMemo(() => {
+    return (product?.player && product.player.trim()) ? product.player.trim() : '';
+  }, [product]);
+
+  const displayColor = useMemo(() => {
+    if (product?.primaryColor && product.primaryColor.trim()) return product.primaryColor.trim();
+    if (product?.color && product.color.trim()) {
+      return product.color.split('/')[0]?.trim();
+    }
+    return '';
+  }, [product]);
+
+  // Dynamic available sizes (supports jerseys, boots/footwear, accessories)
+  const availableSizes = useMemo(() => {
+    if (product?.sizes && Array.isArray(product.sizes) && product.sizes.length > 0) {
+      return product.sizes;
+    }
+    if (product?.stock_per_size && typeof product.stock_per_size === 'object') {
+      const keys = Object.keys(product.stock_per_size);
+      if (keys.length > 0) return keys;
+    }
+    return ['S', 'M', 'L', 'XL', '2XL'];
+  }, [product]);
+
+  useEffect(() => {
+    if (availableSizes.length > 0 && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(availableSizes[0]);
+    }
+  }, [availableSizes, selectedSize]);
+
   const discountPercent = useMemo(() => {
     if (!product) return null;
     if (product.original_price && product.original_price > product.price) {
@@ -381,7 +412,7 @@ export default function Product({ productId }) {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                {["S", "M", "L", "XL", "2XL"].map((size) => {
+                {availableSizes.map((size) => {
                   const stock = product.stock_per_size?.[size];
                   const isOutOfStock = stock === 0;
                   const isSelected = selectedSize === size;
@@ -525,67 +556,26 @@ export default function Product({ productId }) {
 
                 {openAccordion === 'details' && (
                   <div style={{ paddingBottom: '1.25rem', fontSize: '0.8125rem', color: '#444', lineHeight: 1.6 }}>
-                    
-                    {/* 1. Main Description Paragraph & Contextual Hyperlinks */}
-                    <div style={{ marginBottom: '1.25rem', lineHeight: 1.75 }}>
-                      {product.description && (
-                        <p style={{ marginBottom: '0.85rem', color: '#27272a' }}>
+                    {/* Main Description Paragraph */}
+                    {product.description && (
+                      <div style={{ marginBottom: '1.25rem', lineHeight: 1.75 }}>
+                        <p style={{ color: '#27272a' }}>
                           {product.description}
                         </p>
-                      )}
-
-                      {/* Styled contextual paragraph with direct hyperlinks */}
-                      <div style={{
-                        padding: '0.85rem 1rem',
-                        backgroundColor: '#f9fafb',
-                        borderLeft: '3px solid #000',
-                        borderRadius: '0 4px 4px 0',
-                        fontSize: '0.8125rem',
-                        color: '#374151'
-                      }}>
-                        Official matchday specification{' '}
-                        <Link
-                          href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
-                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
-                        >
-                          {kitInfo.label}
-                        </Link>{' '}
-                        for{' '}
-                        <Link
-                          href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
-                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
-                        >
-                          {displayTeam}
-                        </Link>{' '}
-                        ({' '}
-                        <Link
-                          href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
-                          style={{ fontWeight: 700, color: '#000', textDecoration: 'underline' }}
-                        >
-                          {displayYear}
-                        </Link>{' '}
-                        Season), tailored in premium{' '}
-                        <Link
-                          href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
-                          style={{ fontWeight: 700, color: '#000', backgroundColor: '#e5ff00', padding: '1px 5px', textDecoration: 'underline' }}
-                        >
-                          {displayVersion}
-                        </Link>{' '}
-                        construction.
                       </div>
-                    </div>
+                    )}
 
-                    {/* 2. Interactive Hyperlink Spec Cards */}
+                    {/* Interactive Spec Cards (6 boxes) */}
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                       gap: '0.65rem',
-                      marginBottom: '1.5rem',
                       backgroundColor: '#f4f4f5',
                       padding: '0.75rem',
                       borderRadius: '6px',
                       border: '1px solid #e4e4e7'
                     }}>
+                      {/* Box 1: Team / Club */}
                       <Link
                         href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
                         style={{
@@ -606,6 +596,7 @@ export default function Product({ productId }) {
                         </span>
                       </Link>
 
+                      {/* Box 2: Season / Year */}
                       <Link
                         href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
                         style={{
@@ -626,6 +617,7 @@ export default function Product({ productId }) {
                         </span>
                       </Link>
 
+                      {/* Box 3: Kit Type */}
                       <Link
                         href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
                         style={{
@@ -646,6 +638,7 @@ export default function Product({ productId }) {
                         </span>
                       </Link>
 
+                      {/* Box 4: Quality / Version */}
                       <Link
                         href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
                         style={{
@@ -665,55 +658,54 @@ export default function Product({ productId }) {
                           {displayVersion} <ArrowRight size={12} />
                         </span>
                       </Link>
-                    </div>
 
-                    {/* 3. Technical Specs Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.5rem', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                      <span style={{ color: '#888' }}>PLAYER:</span>
-                      <strong style={{ color: '#000' }}>{product.player || 'N/A'}</strong>
-
-                      <span style={{ color: '#888' }}>CLUB / TEAM:</span>
+                      {/* Box 5: Player */}
                       <Link
-                        href={`/collections/all?team=${encodeURIComponent(displayTeam)}`}
-                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                        href={displayPlayer ? `/collections/all?player=${encodeURIComponent(displayPlayer)}` : '/collections/all'}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
                       >
-                        {displayTeam}
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Player
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {displayPlayer || 'Fan Edition'} <ArrowRight size={12} />
+                        </span>
                       </Link>
 
-                      <span style={{ color: '#888' }}>SEASON / YEAR:</span>
+                      {/* Box 6: Color Code */}
                       <Link
-                        href={`/collections/all?year=${encodeURIComponent(product.year || displayYear)}`}
-                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
+                        href={displayColor ? `/collections/all?color=${encodeURIComponent(displayColor)}` : '/collections/all'}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#ffffff',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: '4px',
+                          border: '1px solid #e4e4e7',
+                          textDecoration: 'none'
+                        }}
                       >
-                        {displayYear}
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, letterSpacing: '0.08em', color: '#71717a', textTransform: 'uppercase' }}>
+                          Color Code
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#000000', textTransform: 'uppercase', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            {displayColor && (
+                              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', backgroundColor: displayColor.toLowerCase(), border: '1px solid #d4d4d8' }}></span>
+                            )}
+                            {product.primaryColor ? `${product.primaryColor}${product.secondaryColor ? ' / ' + product.secondaryColor : ''}` : (product.color || 'Official Palette')}
+                          </span>
+                          <ArrowRight size={12} />
+                        </span>
                       </Link>
-
-                      <span style={{ color: '#888' }}>KIT TYPE:</span>
-                      <Link
-                        href={`/collections/all?kit_type=${encodeURIComponent(kitInfo.param)}`}
-                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
-                      >
-                        {kitInfo.label}
-                      </Link>
-
-                      <span style={{ color: '#888' }}>QUALITY / VERSION:</span>
-                      <Link
-                        href={`/collections/all?version=${encodeURIComponent(displayVersion)}`}
-                        style={{ color: '#000', fontWeight: 700, textDecoration: 'underline' }}
-                      >
-                        {displayVersion}
-                      </Link>
-
-                      <span style={{ color: '#888' }}>EDITION:</span>
-                      <strong style={{ color: '#000' }}>{product.edition || 'CLASSIC MATCHDAY'}</strong>
-
-                      <span style={{ color: '#888' }}>MATERIAL:</span>
-                      <strong style={{ color: '#000' }}>{product.material || 'PREMIUM DOTKNIT POLYESTER'}</strong>
-
-                      <span style={{ color: '#888' }}>COLORWAY:</span>
-                      <strong style={{ color: '#000' }}>
-                        {product.primaryColor ? `${product.primaryColor}${product.secondaryColor ? ' / ' + product.secondaryColor : ''}` : (product.color || 'OFFICIAL PALETTE')}
-                      </strong>
                     </div>
                   </div>
                 )}

@@ -44,19 +44,41 @@ export function normalizeProduct(row) {
     }
   }
 
+  // Extract multi-categories array safely
+  let categoriesArr = [];
+  if (Array.isArray(row.categories) && row.categories.length > 0) {
+    categoriesArr = row.categories;
+  } else if (row.category) {
+    categoriesArr = [row.category];
+    if (row.secondary_category && !categoriesArr.includes(row.secondary_category)) {
+      categoriesArr.push(row.secondary_category);
+    }
+  }
+
+  // Extract custom or standard sizes safely
+  let sizesArr = [];
+  if (Array.isArray(row.sizes) && row.sizes.length > 0) {
+    sizesArr = row.sizes;
+  } else if (row.stock_per_size && typeof row.stock_per_size === 'object' && Object.keys(row.stock_per_size).length > 0) {
+    sizesArr = Object.keys(row.stock_per_size);
+  } else {
+    sizesArr = ['S', 'M', 'L', 'XL', '2XL'];
+  }
+
   return {
     id: row.id,
     name: row.name,
     price: Number(row.price),
     original_price: row.original_price ? Number(row.original_price) : undefined,
-    category: row.category,
+    category: row.category || categoriesArr[0] || 'HALF SLEEVES',
+    categories: categoriesArr,
     secondaryCategory: row.secondary_category || row.secondaryCategory,
     badge: row.badge,
     color: row.color || [primary, secondary].filter(Boolean).join(' / '),
     primaryColor: primary,
     secondaryColor: secondary,
-    sizes: row.sizes || ['S', 'M', 'L', 'XL', '2XL'],
-    stock_per_size: row.stock_per_size || { S: 5, M: 5, L: 5, XL: 5, '2XL': 5 },
+    sizes: sizesArr,
+    stock_per_size: row.stock_per_size || {},
     images: Array.isArray(row.images) && row.images.length > 0
       ? row.images
       : ['/images/placeholder-jersey.jpg'],
@@ -148,17 +170,30 @@ export async function createProduct(productData) {
   const secondary = productData.secondaryColor || null;
   const combinedColor = [primary, secondary].filter(Boolean).join(' / ') || productData.color || null;
 
+  const cats = Array.isArray(productData.categories) && productData.categories.length > 0
+    ? productData.categories
+    : [productData.category].filter(Boolean);
+
+  const mainCategory = cats[0] || productData.category || 'HALF SLEEVES';
+
+  const productSizes = Array.isArray(productData.sizes) && productData.sizes.length > 0
+    ? productData.sizes
+    : (productData.stock_per_size && Object.keys(productData.stock_per_size).length > 0
+        ? Object.keys(productData.stock_per_size)
+        : ['S', 'M', 'L', 'XL', '2XL']);
+
   const payload = {
     name: productData.name,
     price: Number(productData.price),
     original_price: productData.original_price ? Number(productData.original_price) : null,
-    category: productData.category,
-    secondary_category: productData.secondaryCategory || null,
+    category: mainCategory,
+    categories: cats,
+    secondary_category: cats[1] || productData.secondaryCategory || null,
     badge: productData.badge || null,
     color: combinedColor,
     primary_color: primary,
     secondary_color: secondary,
-    sizes: productData.sizes || ['S', 'M', 'L', 'XL', '2XL'],
+    sizes: productSizes,
     stock_per_size: productData.stock_per_size || {},
     images: productData.images || [],
     player: productData.player || null,
@@ -199,17 +234,30 @@ export async function updateProduct(id, productData) {
   const secondary = productData.secondaryColor || null;
   const combinedColor = [primary, secondary].filter(Boolean).join(' / ') || productData.color || null;
 
+  const cats = Array.isArray(productData.categories) && productData.categories.length > 0
+    ? productData.categories
+    : [productData.category].filter(Boolean);
+
+  const mainCategory = cats[0] || productData.category || 'HALF SLEEVES';
+
+  const productSizes = Array.isArray(productData.sizes) && productData.sizes.length > 0
+    ? productData.sizes
+    : (productData.stock_per_size && Object.keys(productData.stock_per_size).length > 0
+        ? Object.keys(productData.stock_per_size)
+        : ['S', 'M', 'L', 'XL', '2XL']);
+
   const payload = {
     name: productData.name,
     price: Number(productData.price),
     original_price: productData.original_price ? Number(productData.original_price) : null,
-    category: productData.category,
-    secondary_category: productData.secondaryCategory || null,
+    category: mainCategory,
+    categories: cats,
+    secondary_category: cats[1] || productData.secondaryCategory || null,
     badge: productData.badge || null,
     color: combinedColor,
     primary_color: primary,
     secondary_color: secondary,
-    sizes: productData.sizes || ['S', 'M', 'L', 'XL', '2XL'],
+    sizes: productSizes,
     stock_per_size: productData.stock_per_size || {},
     images: productData.images || [],
     player: productData.player || null,

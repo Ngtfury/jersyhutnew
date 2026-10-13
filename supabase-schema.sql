@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   price NUMERIC NOT NULL,
   original_price NUMERIC,
   category TEXT NOT NULL,
+  categories TEXT[] DEFAULT ARRAY[]::text[],
   secondary_category TEXT,
   badge TEXT,
   color TEXT,
@@ -78,7 +79,13 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS year TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS team TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS version TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS kit_type TEXT;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS categories TEXT[] DEFAULT ARRAY[]::text[];
 ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS min_order_quantity INTEGER DEFAULT 10;
+
+-- Backfill categories array from single category for existing items (safe & non-destructive)
+UPDATE public.products 
+SET categories = ARRAY[category] 
+WHERE (categories IS NULL OR cardinality(categories) = 0) AND category IS NOT NULL;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products (category);

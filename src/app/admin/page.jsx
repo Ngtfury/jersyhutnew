@@ -155,6 +155,7 @@ export default function AdminPage() {
     price: '',
     original_price: '',
     category: 'HALF SLEEVES',
+    categories: ['HALF SLEEVES'],
     badge: '',
     primaryColor: 'Blue',
     secondaryColor: 'White',
@@ -179,6 +180,7 @@ export default function AdminPage() {
   const [formData, setFormData] = useState(initialFormState);
   const [customTeams, setCustomTeams] = useState([]);
   const [isNewTeamMode, setIsNewTeamMode] = useState(false);
+  const [customSizeInput, setCustomSizeInput] = useState('');
   const fileInputRef = useRef(null);
 
   // Load all products, categories, vendors & site banners
@@ -311,6 +313,83 @@ export default function AdminPage() {
     }));
   };
 
+  const handleAddCustomSize = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = customSizeInput.trim().toUpperCase();
+    if (!trimmed) return;
+    if (formData.active_sizes.includes(trimmed)) {
+      showToast(`Size "${trimmed}" is already added.`, 'error');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      active_sizes: [...prev.active_sizes, trimmed],
+      stock_per_size: {
+        ...prev.stock_per_size,
+        [trimmed]: prev.stock_per_size[trimmed] ?? 5
+      }
+    }));
+    setCustomSizeInput('');
+    showToast(`Added size "${trimmed}"`);
+  };
+
+  const handleRemoveSize = (sizeToRemove) => {
+    setFormData(prev => {
+      const remaining = prev.active_sizes.filter(s => s !== sizeToRemove);
+      const updatedStock = { ...prev.stock_per_size };
+      delete updatedStock[sizeToRemove];
+      return {
+        ...prev,
+        active_sizes: remaining,
+        stock_per_size: updatedStock
+      };
+    });
+  };
+
+  const handleApplySizePreset = (presetName) => {
+    let targetSizes = [];
+    if (presetName === 'APPAREL') targetSizes = ['S', 'M', 'L', 'XL', '2XL'];
+    if (presetName === 'BOOTS') targetSizes = ['5', '6', '7', '8', '9', '10', '11'];
+    if (presetName === 'FREESIZE') targetSizes = ['FREE SIZE'];
+
+    const newStock = {};
+    targetSizes.forEach(s => {
+      newStock[s] = formData.stock_per_size[s] ?? 5;
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      active_sizes: targetSizes,
+      stock_per_size: newStock
+    }));
+    showToast(`Applied ${presetName} sizes preset`);
+  };
+
+  const handleToggleCategory = (catName) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.categories) && prev.categories.length > 0
+        ? prev.categories
+        : [prev.category].filter(Boolean);
+      
+      let nextCats;
+      if (current.includes(catName)) {
+        if (current.length === 1) {
+          showToast('Product must belong to at least 1 collection', 'error');
+          return prev;
+        }
+        nextCats = current.filter(c => c !== catName);
+      } else {
+        nextCats = [...current, catName];
+      }
+
+      return {
+        ...prev,
+        categories: nextCats,
+        category: nextCats[0] || 'HALF SLEEVES'
+      };
+    });
+  };
+
   // Switch to edit product
   const handleEdit = (product) => {
     setEditingId(product.id);
@@ -333,16 +412,27 @@ export default function AdminPage() {
       if (!productTeam && product.country) productTeam = product.country;
     }
 
+    const prodCats = Array.isArray(product.categories) && product.categories.length > 0
+      ? product.categories
+      : [product.category, product.secondaryCategory].filter(Boolean);
+
+    const prodSizes = Array.isArray(product.sizes) && product.sizes.length > 0
+      ? product.sizes
+      : (product.stock_per_size && Object.keys(product.stock_per_size).length > 0
+          ? Object.keys(product.stock_per_size)
+          : ['S', 'M', 'L', 'XL', '2XL']);
+
     setFormData({
       name: product.name,
       price: product.price,
       original_price: product.original_price || '',
-      category: product.category || 'HALF SLEEVES',
+      category: prodCats[0] || product.category || 'HALF SLEEVES',
+      categories: prodCats.length > 0 ? prodCats : ['HALF SLEEVES'],
       badge: product.badge || '',
       primaryColor: product.primaryColor || (product.color ? product.color.split('/')[0]?.trim() : ''),
       secondaryColor: product.secondaryColor || (product.color && product.color.includes('/') ? product.color.split('/')[1]?.trim() : ''),
-      stock_per_size: product.stock_per_size || { S: 5, M: 5, L: 5, XL: 5, '2XL': 5 },
-      active_sizes: product.sizes || ['S', 'M', 'L', 'XL', '2XL'],
+      stock_per_size: product.stock_per_size || {},
+      active_sizes: prodSizes,
       images: product.images || [],
       player: product.player || '',
       team: productTeam,
@@ -404,11 +494,18 @@ export default function AdminPage() {
     }
 
     setSubmitting(true);
+    const finalCats = Array.isArray(formData.categories) && formData.categories.length > 0
+      ? formData.categories
+      : [formData.category || 'HALF SLEEVES'];
+
     const payload = {
       ...formData,
       price: Number(formData.price),
       original_price: formData.original_price ? Number(formData.original_price) : undefined,
+      category: finalCats[0],
+      categories: finalCats,
       sizes: formData.active_sizes,
+      stock_per_size: formData.stock_per_size,
       images: formData.images.length > 0 ? formData.images : ['/images/placeholder-jersey.jpg'],
       vendorPrice: formData.vendorPrice !== '' ? Number(formData.vendorPrice) : undefined,
     };
@@ -1166,33 +1263,74 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Category Selection (Custom + Core, NO Best Seller) */}
+              {/* Category / Collection Selection (Multi-Collection) */}
               <div style={{ marginBottom: '1.75rem', backgroundColor: '#09090b', padding: '1.25rem', borderRadius: '8px', border: '1px solid #27272a' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#d4d4d8' }}>
-                    Category *
-                  </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8125rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fff', display: 'block' }}>
+                      Assign to Collections / Categories *
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>
+                      Select all collections where this product should appear (can belong to multiple).
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setActiveTab('categories')}
                     style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    + Manage Categories
+                    + Manage Collections
                   </button>
                 </div>
 
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  style={{ width: '100%', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', padding: '0.75rem 1rem', color: '#fff', fontSize: '0.875rem', outline: 'none', cursor: 'pointer' }}
-                >
-                  {categories.map(cat => (
-                    <option key={cat.id || cat.name} value={cat.name}>{cat.name}</option>
+                {/* Multi-Collection Selectable Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.6rem', marginTop: '0.5rem' }}>
+                  {categories.map(cat => {
+                    const isSelected = (formData.categories || [formData.category]).includes(cat.name);
+                    return (
+                      <button
+                        key={cat.id || cat.name}
+                        type="button"
+                        onClick={() => handleToggleCategory(cat.name)}
+                        style={{
+                          padding: '0.75rem 0.85rem',
+                          borderRadius: '6px',
+                          border: isSelected ? '1px solid #10b981' : '1px solid #27272a',
+                          backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.15)' : '#18181b',
+                          color: isSelected ? '#10b981' : '#d4d4d8',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ textTransform: 'uppercase' }}>{cat.name}</span>
+                        {isSelected ? <Check size={14} color="#10b981" /> : <Plus size={14} color="#71717a" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#a1a1aa', fontWeight: 600 }}>Active in:</span>
+                  {(formData.categories || [formData.category]).map(c => (
+                    <span key={c} style={{ backgroundColor: '#27272a', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {c}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCategory(c)}
+                        style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: 0, display: 'flex' }}
+                        title="Remove from collection"
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
                   ))}
-                </select>
-                <span style={{ fontSize: '0.75rem', color: '#71717a', marginTop: '0.35rem', display: 'block' }}>
-                  * Best Seller is controlled independently via the checkbox below.
-                </span>
+                </div>
               </div>
 
               {/* TWO COLOR OPTIONS: PRIMARY & SECONDARY */}
@@ -1585,56 +1723,120 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Inventory Stock by Sizes */}
-              <div style={{ marginBottom: '1.75rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#d4d4d8', marginBottom: '0.75rem' }}>
-                  Available Sizes & Stock Quantity per Size
-                </label>
+              {/* Inventory Stock by Sizes (Dynamic / Custom Sizes) */}
+              <div style={{ marginBottom: '1.75rem', backgroundColor: '#09090b', padding: '1.25rem', borderRadius: '8px', border: '1px solid #27272a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fff', marginBottom: '0.2rem' }}>
+                      Available Sizes & Inventory per Size
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>
+                      Supports standard apparel (S-2XL), boot/shoe sizes (5, 6, 7, 8, 9...), or custom measurements.
+                    </span>
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                  {SIZES.map(size => {
-                    const isChecked = formData.active_sizes.includes(size);
-                    const qty = formData.stock_per_size[size] ?? 0;
-
-                    return (
-                      <div
-                        key={size}
-                        style={{
-                          backgroundColor: isChecked ? '#27272a' : '#09090b',
-                          border: isChecked ? '1px solid #52525b' : '1px solid #27272a',
-                          borderRadius: '6px',
-                          padding: '0.75rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          id={`size-${size}`}
-                          checked={isChecked}
-                          onChange={() => handleSizeToggle(size)}
-                          style={{ cursor: 'pointer', accentColor: '#fff' }}
-                        />
-                        <label htmlFor={`size-${size}`} style={{ fontSize: '0.875rem', fontWeight: 700, color: isChecked ? '#fff' : '#71717a', cursor: 'pointer' }}>
-                          {size}
-                        </label>
-
-                        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '0.6875rem', color: '#71717a' }}>Qty</span>
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!isChecked}
-                            value={isChecked ? qty : 0}
-                            onChange={(e) => handleStockChange(size, e.target.value)}
-                            style={{ width: '44px', padding: '3px', backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '4px', color: '#fff', fontSize: '0.75rem', textAlign: 'center' }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Size Preset Buttons */}
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleApplySizePreset('APPAREL')}
+                      style={{ padding: '4px 10px', fontSize: '0.7rem', backgroundColor: '#18181b', color: '#d4d4d8', border: '1px solid #3f3f46', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Preset: Apparel (S-2XL)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplySizePreset('BOOTS')}
+                      style={{ padding: '4px 10px', fontSize: '0.7rem', backgroundColor: '#18181b', color: '#60a5fa', border: '1px solid #3b82f655', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Preset: Boots (5-11)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplySizePreset('FREESIZE')}
+                      style={{ padding: '4px 10px', fontSize: '0.7rem', backgroundColor: '#18181b', color: '#d4d4d8', border: '1px solid #3f3f46', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Preset: Free Size
+                    </button>
+                  </div>
                 </div>
+
+                {/* Add Custom Size Inline Form */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', maxWidth: '360px' }}>
+                  <input
+                    type="text"
+                    placeholder="Add custom size (e.g. 7.5, UK 9, 3XL)"
+                    value={customSizeInput}
+                    onChange={(e) => setCustomSizeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomSize();
+                      }
+                    }}
+                    style={{ flex: 1, backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '4px', padding: '0.45rem 0.75rem', color: '#fff', fontSize: '0.78rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSize}
+                    style={{ backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '4px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={13} /> Add
+                  </button>
+                </div>
+
+                {/* Sizes List with Quantity and Delete */}
+                {formData.active_sizes.length === 0 ? (
+                  <p style={{ fontSize: '0.78rem', color: '#ef4444', fontStyle: 'italic', margin: 0 }}>
+                    ⚠️ No sizes added yet. Use a preset above or add a custom size.
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.65rem' }}>
+                    {formData.active_sizes.map(size => {
+                      const qty = formData.stock_per_size[size] ?? 0;
+
+                      return (
+                        <div
+                          key={size}
+                          style={{
+                            backgroundColor: '#18181b',
+                            border: '1px solid #3f3f46',
+                            borderRadius: '6px',
+                            padding: '0.65rem 0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: '0.875rem', color: '#fff' }}>
+                              {size}
+                            </strong>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSize(size)}
+                              style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: 0 }}
+                              title={`Remove size ${size}`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.6875rem', color: '#a1a1aa' }}>Stock Qty:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => handleStockChange(size, e.target.value)}
+                              style={{ width: '100%', padding: '3px 6px', backgroundColor: '#09090b', border: '1px solid #52525b', borderRadius: '4px', color: '#fff', fontSize: '0.75rem', textAlign: 'center' }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Image Upload to Supabase Storage */}
