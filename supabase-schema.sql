@@ -82,6 +82,16 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS kit_type TEXT;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS categories TEXT[] DEFAULT ARRAY[]::text[];
 ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS min_order_quantity INTEGER DEFAULT 10;
 
+-- Razorpay transaction columns & user linkage for orders table
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS user_id UUID;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS razorpay_order_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS razorpay_signature TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders (user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_razorpay_order_id ON public.orders (razorpay_order_id);
+CREATE INDEX IF NOT EXISTS idx_orders_razorpay_payment_id ON public.orders (razorpay_payment_id);
+
 -- Backfill categories array from single category for existing items (safe & non-destructive)
 UPDATE public.products 
 SET categories = ARRAY[category] 
@@ -114,6 +124,12 @@ CREATE TABLE IF NOT EXISTS public.orders (
   status TEXT DEFAULT 'placed',
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Non-destructive columns for fulfillment & consignment tracking
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tracking_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tracking_url TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS courier_name TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders (order_number);

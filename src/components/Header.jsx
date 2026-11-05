@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Search, User, ShoppingBag, Menu, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useSearch } from '../context/SearchContext';
+import { useAuth } from '../context/AuthContext';
 import { useModals } from '../app/providers';
 import { getCategories, DEFAULT_CATEGORIES } from '../lib/supabase';
 
@@ -14,6 +15,7 @@ export default function Header() {
   const { totalCount, openCart } = useCart();
   const { openSearch } = useSearch();
   const { openAccount } = useModals();
+  const { user } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -146,10 +148,26 @@ export default function Header() {
             <button 
               onClick={openAccount}
               className="action-btn"
-              aria-label="Customer Account"
+              aria-label={user ? `Account (${user.email})` : "Customer Account"}
+              title={user ? `Signed in as ${user.email}` : "Sign In / Register"}
+              style={{ position: 'relative' }}
               suppressHydrationWarning
             >
               <User size={19} strokeWidth={1.8} />
+              {user && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '2px',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#22c55e'
+                  }}
+                  title="Signed In"
+                />
+              )}
             </button>
 
             <button 

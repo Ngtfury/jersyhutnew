@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { AuthProvider } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { SearchProvider } from '../context/SearchContext';
 import AccountModal from '../components/AccountModal';
@@ -16,28 +17,30 @@ export function Providers({ children }) {
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
 
   return (
-    <CartProvider>
-      <SearchProvider>
-        <ModalContext.Provider
-          value={{
-            openAccount: () => setIsAccountOpen(true),
-            openSizeChart: () => setIsSizeChartOpen(true),
-          }}
-        >
-          {children}
+    <AuthProvider>
+      <CartProvider>
+        <SearchProvider>
+          <ModalContext.Provider
+            value={{
+              openAccount: () => setIsAccountOpen(true),
+              openSizeChart: () => setIsSizeChartOpen(true),
+            }}
+          >
+            {children}
 
-          <AccountModal
-            isOpen={isAccountOpen}
-            onClose={() => setIsAccountOpen(false)}
-          />
+            <AccountModal
+              isOpen={isAccountOpen}
+              onClose={() => setIsAccountOpen(false)}
+            />
 
-          <SizeChartModal
-            isOpen={isSizeChartOpen}
-            onClose={() => setIsSizeChartOpen(false)}
-          />
-        </ModalContext.Provider>
-      </SearchProvider>
-    </CartProvider>
+            <SizeChartModal
+              isOpen={isSizeChartOpen}
+              onClose={() => setIsSizeChartOpen(false)}
+            />
+          </ModalContext.Provider>
+        </SearchProvider>
+      </CartProvider>
+    </AuthProvider>
   );
 }
 

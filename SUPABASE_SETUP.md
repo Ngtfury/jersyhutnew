@@ -101,7 +101,8 @@ Access the admin dashboard at:
 When deploying to Vercel:
 1. In your [Vercel Dashboard](https://vercel.com), select your project.
 2. Go to **Settings** > **Environment Variables**.
-3. Add:
-   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase Anon Key
-4. Redeploy — your live site and `/admin` will now interact with your Supabase database globally!
+104: 3. Add:
+105:    - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase URL
+106:    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase Anon Key
+107:    - `ADMIN_PASSWORD` = choose a strong master password known only to you (protects the `/admin` panel)
+108: 4. Redeploy — your live site and `/admin` will now interact with your Supabase database globally, and `/admin` will be strictly locked to your secret password!

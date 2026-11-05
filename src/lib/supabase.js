@@ -18,6 +18,10 @@ export const DEFAULT_CATEGORIES = [
   { id: 'cat-half-sleeves', name: 'HALF SLEEVES', slug: 'half-sleeves', description: 'Classic matchday & heritage half sleeve shirts.' },
   { id: 'cat-oversized-t', name: 'OVERSIZED T', slug: 'oversized-t', description: 'Heavyweight boxy streetwear football jerseys.' },
   { id: 'cat-tshirts', name: 'TSHIRTS', slug: 'tshirts', description: 'Minimal football warmup & graphic lifestyle tees.' },
+  { id: 'cat-new-era', name: 'NEW ERA', slug: 'new-era', description: 'Contemporary football culture & next-generation jerseys.' },
+  { id: 'cat-bibs', name: 'BIBS', slug: 'bibs', description: 'Official training bibs and scrimmage pinnies.' },
+  { id: 'cat-shorts', name: 'SHORTS', slug: 'shorts', description: 'Matchday and training shorts engineered for performance.' },
+  { id: 'cat-kids', name: 'KIDS', slug: 'kids', description: 'Youth & junior matchday kits for future champions.' },
 ];
 
 /**
@@ -311,6 +315,29 @@ export async function deleteProduct(id) {
  * ===================================================================
  */
 export async function getCategories() {
+  // Always query live Supabase database first so localhost and hosted site stay 100% in sync
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('jerseyhut_categories', JSON.stringify(data));
+        }
+        return data;
+      }
+      if (error) {
+        console.warn('Supabase getCategories query notice:', error.message);
+      }
+    } catch (err) {
+      console.warn('Could not fetch categories from Supabase, checking cache/defaults:', err?.message || err);
+    }
+  }
+
+  // Graceful offline fallback to localStorage
   if (typeof window !== 'undefined') {
     const cached = localStorage.getItem('jerseyhut_categories');
     if (cached) {
@@ -319,24 +346,6 @@ export async function getCategories() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-  }
-
-  if (!supabase) return DEFAULT_CATEGORIES;
-
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (!error && Array.isArray(data) && data.length > 0) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('jerseyhut_categories', JSON.stringify(data));
-      }
-      return data;
-    }
-  } catch (err) {
-    console.warn('Could not fetch categories from Supabase, using defaults:', err.message);
   }
 
   return DEFAULT_CATEGORIES;
@@ -849,3 +858,54 @@ export async function saveCategoryCovers(covers) {
 
   return covers;
 }
+
+/**
+ * Fetch customer orders from Supabase (defaults to only verified paid Razorpay orders)
+ */
+export async function getOrders(options = {}) {
+  const { onlyPaid = true } = typeof options === 'boolean' ? { onlyPaid: options } : options;
+  if (supabase) {
+    try {
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (onlyPaid) {
+        query = query.eq('payment_status', 'paid');
+      }
+
+      const { data, error } = await query;
+
+      if (!error && Array.isArray(data)) {
+        return data;
+      }
+      if (error) {
+        console.warn('Supabase getOrders query notice:', error.message);
+      }
+    } catch (err) {
+      console.warn('Could not fetch orders from Supabase (quota or connection):', err);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Update an order's status (e.g. 'shipped', 'delivered', 'cancelled')
+ */
+export async function updateOrderStatus(orderId, newStatus) {
+  if (!supabase || !orderId) return false;
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId);
+
+    return !error;
+  } catch (err) {
+    console.warn('Failed to update order status:', err);
+    return false;
+  }
+}
+

@@ -148,14 +148,16 @@ export default function CartDrawer({ onCheckout }) {
             </p>
 
             <button
-              onClick={async () => {
-                const itemsToOrder = [...cartItems];
-                decrementProductStock(itemsToOrder).catch(console.error);
+              onClick={() => {
                 closeCart();
-                onCheckout ? onCheckout() : alert("Thank you for choosing Matchday! Routing to secure Indian UPI & Card Payment Gateway...");
+                if (onCheckout) {
+                  onCheckout();
+                } else {
+                  router.push('/checkout');
+                }
               }}
               className="btn btn-primary"
-              style={{ width: '100%', padding: '1rem', marginTop: '0.4rem' }}
+              style={{ width: '100%', padding: '1rem', marginTop: '0.4rem', cursor: 'pointer' }}
               id="cart-checkout-btn"
             >
               PROCEED TO CHECKOUT

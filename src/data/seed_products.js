@@ -1,5 +1,30 @@
 export const PRODUCTS = [
   {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "₹1 LIVE TEST JERSEY (Matchday Test Kit)",
+    price: 1,
+    original_price: 999,
+    category: "HALF SLEEVES",
+    categories: ["HALF SLEEVES"],
+    badge: "TEST KIT",
+    sizes: ["FREE", "S", "M", "L", "XL"],
+    stock_per_size: { FREE: 999, S: 999, M: 999, L: 999, XL: 999 },
+    images: [
+      "https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=800&q=80"
+    ],
+    player: "TEST",
+    team: "MATCHDAY TEST XI",
+    country: "INDIA",
+    edition: "2025-26 TEST",
+    material: "AERO-COOL",
+    color: "Gold / Black",
+    primaryColor: "Gold",
+    secondaryColor: "Black",
+    featured: true,
+    isBestSeller: false,
+    description: "Official 1-Rupee test kit to test real Razorpay UPI, Cards, NetBanking, and email confirmation with zero delivery charge."
+  },
+  {
     id: "7b1a68a8-727f-4e31-8ea6-898f9bd6813f",
     name: "MBAPPE | FRANCE WC 26 HOME",
     price: 499,

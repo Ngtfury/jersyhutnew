@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart } from '../context/CartContext';
 import { useModals } from '../app/providers';
 import { PRODUCTS as DEFAULT_PRODUCTS } from '../data/products';
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 
 export default function Product({ productId }) {
+  const router = useRouter();
   const { addToCart } = useCart();
   const { openSizeChart } = useModals();
   const [allProducts, setAllProducts] = useState([]);
@@ -150,7 +152,11 @@ export default function Product({ productId }) {
   };
 
   const handleBuyNow = () => {
-    if (product) addToCart(product, selectedSize, quantity);
+    if (!product) return;
+    const added = addToCart(product, selectedSize, quantity);
+    if (added) {
+      router.push('/checkout');
+    }
   };
 
   const handleShare = () => {

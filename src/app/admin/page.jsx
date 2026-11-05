@@ -32,7 +32,11 @@ import {
   Tag,
   Palette,
   Shield,
-  Calendar
+  Calendar,
+  Lock,
+  LogOut,
+  Truck,
+  Send
 } from 'lucide-react';
 import { 
   getProducts, 
@@ -56,7 +60,9 @@ import {
   createVendor,
   updateVendor,
   deleteVendor,
-  DEFAULT_VENDORS
+  DEFAULT_VENDORS,
+  getOrders,
+  updateOrderStatus
 } from '../../lib/supabase';
 import { PRODUCTS as LOCAL_PRODUCTS } from '../../data/products';
 
@@ -106,10 +112,19 @@ const COLOR_PRESETS = [
 
 export default function AdminPage() {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState('manage'); // 'manage' | 'add' | 'vendors' | 'categories' | 'banners'
+  const [authenticating, setAuthenticating] = useState(true);
+  const [activeTab, setActiveTab] = useState('manage'); // 'manage' | 'add' | 'vendors' | 'categories' | 'banners' | 'orders'
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [vendors, setVendors] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [orderFilter, setOrderFilter] = useState('all'); // 'all' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+  const [orderSearch, setOrderSearch] = useState('');
+  const [refreshingOrders, setRefreshingOrders] = useState(false);
+  const [trackingForms, setTrackingForms] = useState({});
+  const [shippingInProgress, setShippingInProgress] = useState({});
+  const [activeFulfillOrderId, setActiveFulfillOrderId] = useState(null);
+  const [savedCouriers, setSavedCouriers] = useState(['Blue Dart', 'Delhivery', 'DTDC', 'Speed Post']);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('ALL');
@@ -187,16 +202,18 @@ export default function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodsData, catsData, vendsData, heroData, coversData] = await Promise.all([
+      const [prodsData, catsData, vendsData, heroData, coversData, ordersData] = await Promise.all([
         getProducts(),
         getCategories(),
         getVendors(),
         getHeroBanner(),
-        getCategoryCovers()
+        getCategoryCovers(),
+        getOrders()
       ]);
 
       setProducts(Array.isArray(prodsData) ? prodsData : []);
       if (catsData && catsData.length > 0) setCategories(catsData);
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
       
       const cleanVendors = Array.isArray(vendsData)
         ? vendsData.filter(v => v.name !== 'Apex Jersey Manufacturers' && v.id !== 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d')
@@ -221,8 +238,29 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     setMounted(true);
-    loadData();
+
+    async function verifyAuth() {
+      try {
+        const res = await fetch('/api/admin/auth');
+        const data = await res.json();
+        if (!data.authenticated) {
+          window.location.href = '/admin/login';
+          return;
+        }
+        if (isMounted) {
+          setAuthenticating(false);
+          loadData();
+        }
+      } catch (err) {
+        console.error('Failed to verify admin authentication:', err);
+        window.location.href = '/admin/login';
+      }
+    }
+
+    verifyAuth();
+
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('jerseyhut_custom_teams');
@@ -231,8 +269,29 @@ export default function AdminPage() {
           if (Array.isArray(parsed)) setCustomTeams(parsed);
         }
       } catch (e) {}
+
+      try {
+        const storedCouriers = localStorage.getItem('matchday_saved_couriers');
+        if (storedCouriers) {
+          const parsedC = JSON.parse(storedCouriers);
+          if (Array.isArray(parsedC) && parsedC.length > 0) setSavedCouriers(parsedC);
+        }
+      } catch (e) {}
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth', { method: 'DELETE' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    window.location.href = '/admin/login';
+  };
 
   // Compute all available unique teams from existing products + custom added teams
   const availableTeams = React.useMemo(() => {
@@ -459,6 +518,168 @@ export default function AdminPage() {
     setFormData(initialFormState);
     setIsNewTeamMode(false);
     setActiveTab('manage');
+  };
+
+  // Refresh Customer Orders (Only verified paid Razorpay orders)
+  const handleRefreshOrders = async () => {
+    setRefreshingOrders(true);
+    try {
+      const ordersData = await getOrders({ onlyPaid: true });
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      showToast(`Refreshed ${ordersData?.length || 0} paid orders from Supabase`, 'success');
+    } catch (e) {
+      showToast('Failed to refresh orders', 'error');
+    } finally {
+      setRefreshingOrders(false);
+    }
+  };
+
+  // Helper to persist used courier names for quick 1-click select on future orders
+  const saveCourierToHistory = (courierName) => {
+    if (!courierName || !courierName.trim()) return;
+    const clean = courierName.trim();
+    setSavedCouriers(prev => {
+      const updated = [clean, ...prev.filter(c => c.toLowerCase() !== clean.toLowerCase())].slice(0, 8);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('matchday_saved_couriers', JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+  };
+
+  // Open fulfillment text boxes for an order
+  const handleOpenFulfill = (order) => {
+    setActiveFulfillOrderId(order.id);
+    const existingCourier = order.courier_name || order.shipping_address?.courier_name || '';
+    const existingAwb = order.tracking_id || order.shipping_address?.tracking_id || '';
+    const existingUrl = order.tracking_url || order.shipping_address?.tracking_url || '';
+
+    setTrackingForms(prev => ({
+      ...prev,
+      [order.id]: {
+        courierName: prev[order.id]?.courierName !== undefined ? prev[order.id].courierName : (existingCourier || savedCouriers[0] || ''),
+        trackingId: prev[order.id]?.trackingId !== undefined ? prev[order.id].trackingId : existingAwb,
+        trackingUrl: prev[order.id]?.trackingUrl !== undefined ? prev[order.id].trackingUrl : existingUrl
+      }
+    }));
+  };
+
+  // Close fulfillment text boxes
+  const handleCloseFulfill = (orderId) => {
+    setActiveFulfillOrderId(null);
+  };
+
+  // Cancel an order
+  const handleCancelOrder = async (order) => {
+    if (!window.confirm(`Are you sure you want to cancel Order ${order.order_number}?`)) return;
+    try {
+      const ok = await updateOrderStatus(order.id, 'cancelled');
+      if (ok) {
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'cancelled' } : o));
+        showToast(`Order ${order.order_number} marked as CANCELLED`, 'success');
+      } else {
+        showToast('Failed to cancel order in database', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error cancelling order', 'error');
+    }
+  };
+
+  // Confirm Order & Send Customer Tracking Email
+  const handleConfirmShipment = async (order) => {
+    const existingTrackingId = order.tracking_id || order.shipping_address?.tracking_id || '';
+    const existingCourier = order.courier_name || order.shipping_address?.courier_name || '';
+    const existingUrl = order.tracking_url || order.shipping_address?.tracking_url || '';
+    
+    const form = trackingForms[order.id] || {};
+    const courierName = (form.courierName !== undefined ? form.courierName : (existingCourier || savedCouriers[0] || '')).trim();
+    const trackingId = (form.trackingId !== undefined ? form.trackingId : existingTrackingId).trim();
+    const trackingUrl = (form.trackingUrl !== undefined ? form.trackingUrl : existingUrl).trim();
+
+    if (!courierName) {
+      showToast('Please enter a Courier Partner name before confirming', 'error');
+      return;
+    }
+
+    if (!trackingId) {
+      showToast('Please enter a Tracking ID / AWB number before confirming', 'error');
+      return;
+    }
+
+    setShippingInProgress(prev => ({ ...prev, [order.id]: true }));
+    try {
+      const res = await fetch('/api/orders/ship', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.order_number,
+          courierName,
+          trackingId,
+          trackingUrl
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update order to shipped');
+      }
+
+      // Save courier into history so future orders have it as a 1-click option
+      saveCourierToHistory(courierName);
+
+      // Update orders in local state
+      setOrders(prev => prev.map(o => {
+        if (o.id === order.id || o.order_number === order.order_number) {
+          return {
+            ...o,
+            status: 'shipped',
+            courier_name: courierName,
+            tracking_id: trackingId,
+            tracking_url: trackingUrl,
+            shipping_address: {
+              ...(o.shipping_address || {}),
+              courier_name: courierName,
+              tracking_id: trackingId,
+              tracking_url: trackingUrl,
+              shipped_at: new Date().toISOString(),
+              shipped_email_sent: data.emailSent
+            }
+          };
+        }
+        return o;
+      }));
+
+      // Close the fulfillment text boxes — once shipped, no edit option is shown
+      setActiveFulfillOrderId(null);
+
+      const emailNote = data.emailSent 
+        ? ` Customer tracking email sent to ${order.customer_email || 'customer'}!`
+        : ` (Store notification sent)`;
+      showToast(`Order ${order.order_number} marked as SHIPPED!${emailNote}`, 'success');
+    } catch (err) {
+      console.error('Shipment error:', err);
+      showToast(err.message || 'Error marking order as shipped', 'error');
+    } finally {
+      setShippingInProgress(prev => ({ ...prev, [order.id]: false }));
+    }
+  };
+
+  // Update Customer Order Status (manual override)
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const ok = await updateOrderStatus(orderId, newStatus);
+      if (ok) {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        showToast(`Order updated to "${newStatus.toUpperCase()}"`, 'success');
+      } else {
+        showToast('Failed to update order status in Supabase', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error updating order', 'error');
+    }
   };
 
   // Delete product
@@ -786,12 +1007,43 @@ export default function AdminPage() {
     return total <= threshold;
   }).length;
 
-  if (!mounted) {
+  const filteredOrders = orders.filter(order => {
+    // In admin panel orders: strictly only show paid Razorpay orders
+    if (order.payment_status !== 'paid') return false;
+
+    // Fulfillment status filter
+    if (orderFilter !== 'all') {
+      if (orderFilter === 'confirmed') {
+        if (order.status !== 'confirmed' && order.status !== 'pending' && order.status) return false;
+      } else if (order.status !== orderFilter) {
+        return false;
+      }
+    }
+
+    if (orderSearch.trim()) {
+      const q = orderSearch.toLowerCase().trim();
+      const matchNum = order.order_number?.toLowerCase().includes(q);
+      const matchName = order.customer_name?.toLowerCase().includes(q);
+      const matchPhone = order.customer_phone?.toLowerCase().includes(q);
+      const matchEmail = order.customer_email?.toLowerCase().includes(q);
+      const matchCity = order.shipping_address?.city?.toLowerCase().includes(q);
+      const matchPayId = order.razorpay_payment_id?.toLowerCase().includes(q);
+      const matchAwb = (order.tracking_id || order.shipping_address?.tracking_id || '')?.toLowerCase().includes(q);
+      const matchCourier = (order.courier_name || order.shipping_address?.courier_name || '')?.toLowerCase().includes(q);
+
+      if (!matchNum && !matchName && !matchPhone && !matchEmail && !matchCity && !matchPayId && !matchAwb && !matchCourier) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  if (!mounted || authenticating) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: '#f4f4f5', padding: '4rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
         <div style={{ width: '28px', height: '28px', border: '2px solid #27272a', borderTopColor: '#ffffff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <span style={{ fontSize: '0.8125rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#71717a', fontWeight: 600 }}>
-          Loading Admin Dashboard...
+          {authenticating ? 'Verifying Admin Security Authorization...' : 'Loading Admin Dashboard...'}
         </span>
       </div>
     );
@@ -839,6 +1091,29 @@ export default function AdminPage() {
             >
               <RefreshCw size={16} />
             </button>
+
+            <button
+              onClick={handleLogout}
+              title="Log out and lock admin console"
+              style={{
+                background: '#18181b',
+                border: '1px solid #3f3f46',
+                color: '#f87171',
+                padding: '0.5rem 0.85rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase'
+              }}
+            >
+              <Lock size={14} />
+              <span>Lock Panel</span>
+            </button>
           </div>
         </div>
 
@@ -885,6 +1160,40 @@ export default function AdminPage() {
             }}
           >
             Inventory ({products.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orders')}
+            style={{
+              padding: '1rem 1.25rem',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: activeTab === 'orders' ? '#4ade80' : '#a1a1aa',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'orders' ? '2px solid #22c55e' : '2px solid transparent',
+              cursor: 'pointer',
+              marginBottom: '-1px',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span>Customer Orders</span>
+            <span style={{
+              backgroundColor: activeTab === 'orders' ? '#22c55e' : '#27272a',
+              color: activeTab === 'orders' ? '#09090b' : '#4ade80',
+              fontWeight: 900,
+              fontSize: '0.6875rem',
+              padding: '2px 7px',
+              borderRadius: '999px',
+              border: '1px solid rgba(74, 222, 128, 0.3)'
+            }}>
+              {orders.filter(o => o.payment_status === 'paid').length}
+            </span>
           </button>
 
           <button
@@ -2547,6 +2856,695 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* ========================================================= */}
+        {/* TAB 6: CUSTOMER ORDERS (RAZORPAY) */}
+        {/* ========================================================= */}
+        {activeTab === 'orders' && (
+          <div>
+            {/* Orders Metric Bar */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Paid Orders</span>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#38bdf8' }}>
+                    {orders.filter(o => o.payment_status === 'paid').length}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Revenue</span>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#4ade80' }}>
+                    ₹{orders.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0)}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ready to Dispatch</span>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#facc15' }}>
+                    {orders.filter(o => o.payment_status === 'paid' && (o.status === 'confirmed' || o.status === 'pending' || !o.status)).length}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Shipped / In Transit</span>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#22c55e' }}>
+                    {orders.filter(o => o.payment_status === 'paid' && o.status === 'shipped').length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', backgroundColor: '#18181b', padding: '1rem', borderRadius: '8px', border: '1px solid #27272a' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'all', label: 'All Paid' },
+                    { key: 'confirmed', label: 'Ready to Ship' },
+                    { key: 'shipped', label: 'Shipped' },
+                    { key: 'delivered', label: 'Delivered' },
+                    { key: 'cancelled', label: 'Cancelled' }
+                  ].map(({ key: fKey, label }) => {
+                    const count = orders.filter(o => {
+                      if (o.payment_status !== 'paid') return false;
+                      if (fKey === 'all') return true;
+                      if (fKey === 'confirmed') return o.status === 'confirmed' || o.status === 'pending' || !o.status;
+                      return o.status === fKey;
+                    }).length;
+
+                    return (
+                      <button
+                        key={fKey}
+                        type="button"
+                        onClick={() => setOrderFilter(fKey)}
+                        style={{
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: orderFilter === fKey ? '#ffffff' : '#09090b',
+                          color: orderFilter === fKey ? '#09090b' : '#a1a1aa',
+                          border: '1px solid #27272a'
+                        }}
+                      >
+                        {label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: '1 1 260px', maxWidth: '420px' }}>
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+                    <input
+                      type="text"
+                      placeholder="Search order #, customer, phone..."
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      style={{ width: '100%', padding: '0.45rem 0.75rem 0.45rem 2rem', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRefreshOrders}
+                    disabled={refreshingOrders}
+                    style={{
+                      padding: '0.45rem 0.85rem',
+                      backgroundColor: '#27272a',
+                      color: '#fff',
+                      border: '1px solid #3f3f46',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="Fetch latest customer orders from Supabase"
+                  >
+                    <RefreshCw size={14} className={refreshingOrders ? 'animate-spin' : ''} />
+                    <span>{refreshingOrders ? 'Syncing...' : 'Sync'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Orders List */}
+              {filteredOrders.length === 0 ? (
+                <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '3rem 2rem', textAlign: 'center', color: '#71717a' }}>
+                  <Package size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                  <h3 style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fff', fontSize: '1rem', marginBottom: '0.5rem' }}>
+                    {orders.length === 0 ? 'No customer orders yet' : 'No orders matching filter'}
+                  </h3>
+                  <p style={{ fontSize: '0.8125rem', maxWidth: '420px', margin: '0 auto', color: '#a1a1aa' }}>
+                    {orders.length === 0 
+                      ? 'When customers complete checkout via Razorpay (UPI, Google Pay, PhonePe, Cards), incoming orders with delivery addresses and kit sizes will appear here.'
+                      : 'Try resetting the search or status filter to see all orders.'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {filteredOrders.map((order) => {
+                    const isPaid = order.payment_status === 'paid';
+                    const customerPhone = order.customer_phone?.replace(/\D/g, '') || '';
+                    const whatsappLink = customerPhone ? `https://wa.me/91${customerPhone}?text=${encodeURIComponent(`Hi ${order.customer_name}, thank you for ordering from Matchday! Inquiry regarding your order ${order.order_number}.`)}` : null;
+
+                    return (
+                      <div
+                        key={order.id || order.order_number}
+                        style={{
+                          backgroundColor: '#18181b',
+                          border: '1px solid #27272a',
+                          borderRadius: '8px',
+                          padding: '1.5rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1rem'
+                        }}
+                      >
+                        {/* Order Header */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid #27272a', paddingBottom: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <span style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'monospace', color: '#fff' }}>
+                              {order.order_number || 'ORDER'}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.6875rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: isPaid ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                                color: isPaid ? '#4ade80' : '#facc15',
+                                border: `1px solid ${isPaid ? 'rgba(34, 197, 94, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`
+                              }}
+                            >
+                              {isPaid ? 'PAID VIA RAZORPAY' : 'PAYMENT PENDING'}
+                            </span>
+
+                            {/* Order Fulfillment Status Badge (No Dropdown) */}
+                            {(() => {
+                              if (order.status === 'shipped') {
+                                return (
+                                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: '#14532d', color: '#86efac', border: '1px solid #16a34a' }}>
+                                    🚚 SHIPPED
+                                  </span>
+                                );
+                              }
+                              if (order.status === 'cancelled') {
+                                return (
+                                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                                    ❌ CANCELLED
+                                  </span>
+                                );
+                              }
+                              if (order.status === 'delivered') {
+                                return (
+                                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: '#1e3a5f', color: '#93c5fd', border: '1px solid #3b82f6' }}>
+                                    📦 DELIVERED
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: 'rgba(250, 204, 21, 0.15)', color: '#facc15', border: '1px solid rgba(250, 204, 21, 0.3)' }}>
+                                  ⏳ READY TO FULFILL
+                                </span>
+                              );
+                            })()}
+                          </div>
+
+                          <div style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>
+                            {order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : ''}
+                          </div>
+                        </div>
+
+                        {/* Customer & Address Details */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', fontSize: '0.8125rem' }}>
+                          <div>
+                            <div style={{ color: '#71717a', fontSize: '0.6875rem', textTransform: 'uppercase', marginBottom: '0.25rem', fontWeight: 700 }}>Customer Details</div>
+                            <div style={{ fontWeight: 700, color: '#fff' }}>{order.customer_name}</div>
+                            <div style={{ color: '#d4d4d8' }}>{order.customer_phone}</div>
+                            {order.customer_email && <div style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>{order.customer_email}</div>}
+                            {whatsappLink && (
+                              <a
+                                href={whatsappLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#22c55e', fontSize: '0.75rem', marginTop: '0.35rem', textDecoration: 'none', fontWeight: 600 }}
+                              >
+                                Message Customer on WhatsApp →
+                              </a>
+                            )}
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#71717a', fontSize: '0.6875rem', textTransform: 'uppercase', marginBottom: '0.25rem', fontWeight: 700 }}>Delivery Address</div>
+                            <div style={{ color: '#d4d4d8', lineHeight: 1.4 }}>
+                              {order.shipping_address?.address || 'Address provided'},<br />
+                              {order.shipping_address?.city}, {order.shipping_address?.state} - <strong>{order.shipping_address?.pincode}</strong>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#71717a', fontSize: '0.6875rem', textTransform: 'uppercase', marginBottom: '0.25rem', fontWeight: 700 }}>Payment Info</div>
+                            <div style={{ color: '#d4d4d8' }}>Gateway: <strong>Razorpay</strong></div>
+                            {order.razorpay_payment_id && (
+                              <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontFamily: 'monospace' }}>
+                                Pay ID: {order.razorpay_payment_id}
+                              </div>
+                            )}
+                            <div style={{ marginTop: '0.35rem', fontSize: '1rem', fontWeight: 800, color: '#fff' }}>
+                              Total: ₹{order.total_amount}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Items Purchased List */}
+                        {Array.isArray(order.items) && order.items.length > 0 && (
+                          <div style={{ borderTop: '1px solid #27272a', paddingTop: '0.75rem' }}>
+                            <div style={{ color: '#71717a', fontSize: '0.6875rem', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: 700 }}>Kits In Order ({order.items.length})</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                              {order.items.map((item, iIdx) => (
+                                <div
+                                  key={iIdx}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    backgroundColor: '#09090b',
+                                    border: '1px solid #27272a',
+                                    padding: '0.4rem 0.65rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem'
+                                  }}
+                                >
+                                  {item.product?.images?.[0] && (
+                                    <img
+                                      src={item.product.images[0]}
+                                      alt=""
+                                      style={{ width: '28px', height: '32px', objectFit: 'cover', borderRadius: '3px' }}
+                                    />
+                                  )}
+                                  <div>
+                                    <div style={{ color: '#fff', fontWeight: 600 }}>{item.product?.name || 'Jersey'}</div>
+                                    <div style={{ color: '#71717a', fontSize: '0.6875rem' }}>
+                                      Size: <strong style={{ color: '#d4d4d8' }}>{item.size}</strong> | Qty: {item.quantity} | ₹{(item.product?.price || item.price || 0) * (item.quantity || 1)}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ========================================================= */}
+                        {/* FULFILLMENT & ACTION FLOW (TEXT BOXES + QUICK SELECT) */}
+                        {/* ========================================================= */}
+                        {(() => {
+                          const isShipped = order.status === 'shipped';
+                          const isCancelled = order.status === 'cancelled';
+                          const isFormOpen = activeFulfillOrderId === order.id;
+
+                          const existingCourier = order.courier_name || order.shipping_address?.courier_name || '';
+                          const existingAwb = order.tracking_id || order.shipping_address?.tracking_id || '';
+                          const existingUrl = order.tracking_url || order.shipping_address?.tracking_url || '';
+                          const shippedAt = order.shipped_at || order.shipping_address?.shipped_at;
+                          const emailSent = order.shipped_email_sent || order.shipping_address?.shipped_email_sent;
+
+                          const form = trackingForms[order.id] || {};
+                          const currentCourier = form.courierName !== undefined ? form.courierName : (existingCourier || savedCouriers[0] || '');
+                          const currentAwb = form.trackingId !== undefined ? form.trackingId : existingAwb;
+                          const currentUrl = form.trackingUrl !== undefined ? form.trackingUrl : existingUrl;
+                          const isShippingThis = Boolean(shippingInProgress[order.id]);
+
+                          // 1. Shipped State: Show tracking info with NO edit option
+                          if (isShipped) {
+                            return (
+                              <div style={{
+                                marginTop: '0.5rem',
+                                padding: '1rem 1.25rem',
+                                backgroundColor: '#052e16',
+                                border: '1px solid #16a34a',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '1rem'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                                  <div style={{ backgroundColor: '#22c55e', color: '#09090b', padding: '0.5rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Truck size={20} />
+                                  </div>
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', color: '#ffffff', letterSpacing: '0.04em' }}>
+                                        Dispatched via {existingCourier || 'Express Courier'}
+                                      </span>
+                                      {emailSent && (
+                                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, backgroundColor: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                                          ✉️ Customer Tracking Email Sent
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#bbf7d0', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                      <span>Tracking ID / AWB: <strong style={{ color: '#ffffff', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{existingAwb || 'N/A'}</strong></span>
+                                      {shippedAt && (
+                                        <span>&bull; {new Date(shippedAt).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  {existingUrl ? (
+                                    <a
+                                      href={existingUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        backgroundColor: '#22c55e',
+                                        color: '#09090b',
+                                        fontWeight: 800,
+                                        fontSize: '0.75rem',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.04em',
+                                        padding: '0.5rem 0.9rem',
+                                        borderRadius: '6px',
+                                        textDecoration: 'none'
+                                      }}
+                                    >
+                                      <span>Track Online</span>
+                                      <ExternalLink size={13} />
+                                    </a>
+                                  ) : (
+                                    existingAwb && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(existingAwb);
+                                          showToast('AWB copied to clipboard');
+                                        }}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.35rem',
+                                          backgroundColor: '#27272a',
+                                          color: '#ffffff',
+                                          border: '1px solid #3f3f46',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 700,
+                                          padding: '0.45rem 0.75rem',
+                                          borderRadius: '6px',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        <Copy size={13} />
+                                        <span>Copy AWB</span>
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 2. Cancelled State
+                          if (isCancelled) {
+                            return (
+                              <div style={{ marginTop: '0.5rem', padding: '0.85rem 1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#fca5a5', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <X size={16} />
+                                <span>This order has been cancelled.</span>
+                              </div>
+                            );
+                          }
+
+                          // 3. Normal Unfulfilled State: Show "Cancel Order" & "Confirm Order" buttons
+                          if (!isFormOpen) {
+                            return (
+                              <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid #27272a', paddingTop: '0.85rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelOrder(order)}
+                                  style={{
+                                    padding: '0.5rem 0.9rem',
+                                    backgroundColor: 'transparent',
+                                    color: '#f87171',
+                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem'
+                                  }}
+                                >
+                                  <X size={14} />
+                                  <span>Cancel Order</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenFulfill(order)}
+                                  style={{
+                                    padding: '0.55rem 1.25rem',
+                                    backgroundColor: '#22c55e',
+                                    color: '#09090b',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: 800,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.45rem',
+                                    boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
+                                  }}
+                                >
+                                  <Truck size={15} />
+                                  <span>Confirm Order</span>
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          // 4. Form Open: Show Text Boxes & Previous Couriers Select
+                          return (
+                            <div style={{
+                              marginTop: '0.75rem',
+                              padding: '1.25rem',
+                              backgroundColor: '#121214',
+                              border: '1px solid #22c55e',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '1rem',
+                              boxShadow: '0 4px 14px rgba(0,0,0,0.4)'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid #27272a', paddingBottom: '0.65rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <Truck size={18} style={{ color: '#22c55e' }} />
+                                  <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', color: '#ffffff', letterSpacing: '0.04em' }}>
+                                    Dispatch & Tracking Details
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCloseFulfill(order.id)}
+                                  style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                  title="Close"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                                {/* Courier Partner Text Box with Quick Previous Selection */}
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', color: '#a1a1aa', marginBottom: '0.35rem' }}>
+                                    Courier Partner *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Type courier name (e.g. DTDC, Delhivery, Speed Post)"
+                                    value={currentCourier}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTrackingForms(prev => ({
+                                        ...prev,
+                                        [order.id]: {
+                                          ...(prev[order.id] || {}),
+                                          courierName: val
+                                        }
+                                      }));
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      backgroundColor: '#09090b',
+                                      border: '1px solid #27272a',
+                                      borderRadius: '6px',
+                                      padding: '0.55rem 0.75rem',
+                                      color: '#ffffff',
+                                      fontSize: '0.8125rem',
+                                      fontWeight: 600,
+                                      outline: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  />
+
+                                  {/* Quick Select Previous Courier Partners */}
+                                  {savedCouriers.length > 0 && (
+                                    <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: '0.65rem', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>Select previous:</span>
+                                      {savedCouriers.map((c) => (
+                                        <button
+                                          key={c}
+                                          type="button"
+                                          onClick={() => {
+                                            setTrackingForms(prev => ({
+                                              ...prev,
+                                              [order.id]: {
+                                                ...(prev[order.id] || {}),
+                                                courierName: c
+                                              }
+                                            }));
+                                          }}
+                                          style={{
+                                            fontSize: '0.6875rem',
+                                            padding: '2px 7px',
+                                            backgroundColor: currentCourier.toLowerCase() === c.toLowerCase() ? '#22c55e' : '#27272a',
+                                            color: currentCourier.toLowerCase() === c.toLowerCase() ? '#09090b' : '#d4d4d8',
+                                            border: '1px solid #3f3f46',
+                                            borderRadius: '4px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          {c}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Tracking ID / AWB Number */}
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', color: '#a1a1aa', marginBottom: '0.35rem' }}>
+                                    Tracking ID / AWB Number *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. BD-883719201 or 123456789"
+                                    value={currentAwb}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTrackingForms(prev => ({
+                                        ...prev,
+                                        [order.id]: {
+                                          ...(prev[order.id] || {}),
+                                          trackingId: val
+                                        }
+                                      }));
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      backgroundColor: '#09090b',
+                                      border: '1px solid #27272a',
+                                      borderRadius: '6px',
+                                      padding: '0.55rem 0.75rem',
+                                      color: '#ffffff',
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.8125rem',
+                                      fontWeight: 700,
+                                      outline: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Tracking Link / URL */}
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', color: '#a1a1aa', marginBottom: '0.35rem' }}>
+                                    Tracking Link / URL
+                                  </label>
+                                  <input
+                                    type="url"
+                                    placeholder="https://track.courier.com/..."
+                                    value={currentUrl}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTrackingForms(prev => ({
+                                        ...prev,
+                                        [order.id]: {
+                                          ...(prev[order.id] || {}),
+                                          trackingUrl: val
+                                        }
+                                      }));
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      backgroundColor: '#09090b',
+                                      border: '1px solid #27272a',
+                                      borderRadius: '6px',
+                                      padding: '0.55rem 0.75rem',
+                                      color: '#ffffff',
+                                      fontSize: '0.8125rem',
+                                      outline: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Form Bottom Actions */}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCloseFulfill(order.id)}
+                                  disabled={isShippingThis}
+                                  style={{
+                                    padding: '0.5rem 1rem',
+                                    backgroundColor: '#27272a',
+                                    color: '#d4d4d8',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmShipment(order)}
+                                  disabled={isShippingThis || !currentCourier.trim() || !currentAwb.trim()}
+                                  style={{
+                                    padding: '0.55rem 1.35rem',
+                                    backgroundColor: (!currentCourier.trim() || !currentAwb.trim() || isShippingThis) ? '#27272a' : '#22c55e',
+                                    color: (!currentCourier.trim() || !currentAwb.trim() || isShippingThis) ? '#71717a' : '#09090b',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 800,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em',
+                                    cursor: (!currentCourier.trim() || !currentAwb.trim() || isShippingThis) ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.45rem'
+                                  }}
+                                >
+                                  {isShippingThis ? (
+                                    <>
+                                      <RefreshCw size={14} className="animate-spin" />
+                                      <span>Dispatching & Sending Email...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send size={14} />
+                                      <span>Confirm & Send Email</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+        )}
+
 
         {/* ========================================================= */}
         {/* VENDOR PROFILE MODAL (CREATE / EDIT) */}
