@@ -42,8 +42,12 @@ function LoginContent() {
   const [resendingEmail, setResendingEmail] = useState(false);
   const [pendingKitName, setPendingKitName] = useState('');
 
-  // Check if there was a pending item from Quick Add
+  // Check if there was a pending item from Quick Add or a verified notice
   useEffect(() => {
+    if (noticeParam === 'verified') {
+      setSuccessMsg('Email confirmed successfully! You can now sign in.');
+    }
+
     try {
       const raw = sessionStorage.getItem('pending_cart_item');
       if (raw) {
@@ -53,7 +57,7 @@ function LoginContent() {
         }
       }
     } catch (e) {}
-  }, []);
+  }, [noticeParam]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

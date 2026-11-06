@@ -164,6 +164,14 @@ export default function AdminPage() {
   const heroFileInputRef = useRef(null);
   const coverFileInputRefs = useRef([]);
 
+  // Users Management state
+  const [usersList, setUsersList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState('all'); // 'all' | 'verified' | 'unverified'
+  const [deletingUserId, setDeletingUserId] = useState(null);
+  const [cleaningUnverified, setCleaningUnverified] = useState(false);
+
   // Form State
   const initialFormState = {
     name: '',
@@ -229,11 +237,84 @@ export default function AdminPage() {
 
       if (heroData) setHeroBanner(heroData);
       if (coversData) setCategoryCovers(coversData);
+
+      // Also pre-fetch registered users
+      fetchUsers();
     } catch (err) {
       console.error('Failed to load data:', err);
       setProducts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUsersList(data.users || []);
+      } else {
+        console.error('Failed to load users:', data.error);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId, userEmail) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user "${userEmail}"? This action cannot be undone.`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+    try {
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUsersList(prev => prev.filter(u => u.id !== userId));
+        showNotification(`User ${userEmail} was deleted successfully.`);
+      } else {
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (err) {
+      alert('Network error while deleting user');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const handleDeleteUnverifiedUsers = async () => {
+    const unverifiedCount = usersList.filter(u => !u.is_verified).length;
+    if (unverifiedCount === 0) {
+      alert('There are no unverified users to delete.');
+      return;
+    }
+    if (!window.confirm(`Delete all ${unverifiedCount} unverified users? Users who have not clicked their confirmation email link will be purged.`)) {
+      return;
+    }
+    setCleaningUnverified(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_unverified' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showNotification(`Cleaned up ${data.deletedCount} unverified accounts.`);
+        fetchUsers();
+      } else {
+        alert(data.error || 'Failed to clean up unverified accounts');
+      }
+    } catch (err) {
+      alert('Network error while cleaning unverified users');
+    } finally {
+      setCleaningUnverified(false);
     }
   };
 
@@ -1274,6 +1355,32 @@ export default function AdminPage() {
             }}
           >
             Home Banners & Covers
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('users');
+              fetchUsers();
+            }}
+            style={{
+              padding: '1rem 1.25rem',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: activeTab === 'users' ? '#38bdf8' : '#71717a',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'users' ? '2px solid #38bdf8' : '2px solid transparent',
+              cursor: 'pointer',
+              marginBottom: '-1px',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem'
+            }}
+          >
+            <Users size={15} /> Users {usersList.length > 0 && `(${usersList.length})`}
           </button>
         </div>
 
@@ -3543,6 +3650,351 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 7: USERS MANAGEMENT (SUPABASE AUTH) */}
+        {/* ========================================================= */}
+        {activeTab === 'users' && (
+          <div>
+            {/* Users Metrics Bar */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+              <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Users</span>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#ffffff' }}>
+                  {usersList.length}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verified Users</span>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#22c55e' }}>
+                  {usersList.filter(u => u.is_verified).length}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unverified (Pending Email)</span>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.35rem', color: '#f59e0b' }}>
+                  {usersList.filter(u => !u.is_verified).length}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleDeleteUnverifiedUsers}
+                  disabled={cleaningUnverified || usersList.filter(u => !u.is_verified).length === 0}
+                  style={{
+                    backgroundColor: usersList.filter(u => !u.is_verified).length > 0 ? '#ef444422' : '#27272a',
+                    border: usersList.filter(u => !u.is_verified).length > 0 ? '1px solid #ef444466' : '1px solid #3f3f46',
+                    color: usersList.filter(u => !u.is_verified).length > 0 ? '#f87171' : '#71717a',
+                    padding: '0.65rem 1rem',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    cursor: usersList.filter(u => !u.is_verified).length > 0 && !cleaningUnverified ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span>{cleaningUnverified ? 'Cleaning...' : 'Delete All Unverified Users'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', backgroundColor: '#18181b', padding: '1rem', borderRadius: '8px', border: '1px solid #27272a' }}>
+              <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '400px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or phone..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#09090b',
+                    border: '1px solid #27272a',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem 0.5rem 2.25rem',
+                    color: '#ffffff',
+                    fontSize: '0.8125rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Status Filter Pills */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setUserFilter('all')}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    backgroundColor: userFilter === 'all' ? '#ffffff' : '#27272a',
+                    color: userFilter === 'all' ? '#09090b' : '#a1a1aa'
+                  }}
+                >
+                  All Users ({usersList.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUserFilter('verified')}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    backgroundColor: userFilter === 'verified' ? '#22c55e' : '#27272a',
+                    color: userFilter === 'verified' ? '#09090b' : '#a1a1aa'
+                  }}
+                >
+                  Verified Only ({usersList.filter(u => u.is_verified).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUserFilter('unverified')}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    backgroundColor: userFilter === 'unverified' ? '#f59e0b' : '#27272a',
+                    color: userFilter === 'unverified' ? '#09090b' : '#a1a1aa'
+                  }}
+                >
+                  Unverified Only ({usersList.filter(u => !u.is_verified).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={fetchUsers}
+                  disabled={loadingUsers}
+                  style={{
+                    padding: '0.45rem 0.75rem',
+                    backgroundColor: '#27272a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    fontSize: '0.75rem'
+                  }}
+                  title="Refresh users"
+                >
+                  <RefreshCw size={13} className={loadingUsers ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Users List */}
+            {loadingUsers ? (
+              <div style={{ padding: '4rem', textAlign: 'center', color: '#71717a' }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 1rem' }} />
+                <div>Loading registered users...</div>
+              </div>
+            ) : (() => {
+              const filtered = usersList.filter(u => {
+                if (userFilter === 'verified' && !u.is_verified) return false;
+                if (userFilter === 'unverified' && u.is_verified) return false;
+                if (userSearch.trim()) {
+                  const q = userSearch.toLowerCase();
+                  const email = (u.email || '').toLowerCase();
+                  const name = (u.name || '').toLowerCase();
+                  const phone = (u.phone || '').toLowerCase();
+                  return email.includes(q) || name.includes(q) || phone.includes(q);
+                }
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div style={{ padding: '4rem', textAlign: 'center', color: '#71717a', backgroundColor: '#18181b', borderRadius: '8px', border: '1px solid #27272a' }}>
+                    <Users size={36} style={{ margin: '0 auto 1rem', color: '#3f3f46' }} />
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#a1a1aa' }}>No users found</div>
+                    <div style={{ fontSize: '0.8125rem', color: '#71717a', marginTop: '0.25rem' }}>
+                      Try adjusting your search query or verification filter.
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {filtered.map((u) => {
+                    const isDeletingThis = deletingUserId === u.id;
+                    const initials = (u.name || u.email || 'U').charAt(0).toUpperCase();
+
+                    return (
+                      <div
+                        key={u.id}
+                        style={{
+                          backgroundColor: '#18181b',
+                          border: u.is_verified ? '1px solid #27272a' : '1px dashed #f59e0b55',
+                          borderRadius: '8px',
+                          padding: '1.25rem',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '1rem'
+                        }}
+                      >
+                        {/* User Identity */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '260px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: u.is_verified ? '#22c55e22' : '#f59e0b22',
+                            color: u.is_verified ? '#4ade80' : '#fbbf24',
+                            border: u.is_verified ? '1px solid #22c55e44' : '1px solid #f59e0b44',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '1rem'
+                          }}>
+                            {initials}
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontWeight: 800, color: '#ffffff', fontSize: '0.9375rem' }}>
+                                {u.name || 'Matchday Fan'}
+                              </span>
+                              {u.is_verified ? (
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#14532d',
+                                  color: '#86efac',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em'
+                                }}>
+                                  ✓ VERIFIED
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#451a03',
+                                  color: '#fcd34d',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em'
+                                }}>
+                                  UNVERIFIED (PENDING)
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                              <span style={{ fontSize: '0.8125rem', color: '#a1a1aa' }}>
+                                {u.email}
+                              </span>
+                              {u.phone && (
+                                <span style={{ fontSize: '0.75rem', color: '#71717a' }}>
+                                  • {u.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* User Timestamps */}
+                        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.75rem', color: '#71717a' }}>
+                          <div>
+                            <span style={{ display: 'block', color: '#52525b', fontSize: '0.6875rem', textTransform: 'uppercase', fontWeight: 700 }}>Joined</span>
+                            <span style={{ color: '#d4d4d8' }}>
+                              {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+
+                          {u.email_confirmed_at && (
+                            <div>
+                              <span style={{ display: 'block', color: '#52525b', fontSize: '0.6875rem', textTransform: 'uppercase', fontWeight: 700 }}>Confirmed</span>
+                              <span style={{ color: '#86efac' }}>
+                                {new Date(u.email_confirmed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                          )}
+
+                          <div>
+                            <span style={{ display: 'block', color: '#52525b', fontSize: '0.6875rem', textTransform: 'uppercase', fontWeight: 700 }}>Last Active</span>
+                            <span style={{ color: '#d4d4d8' }}>
+                              {u.last_sign_in_at
+                                ? new Date(u.last_sign_in_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                : 'Never'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u.id, u.email)}
+                            disabled={isDeletingThis}
+                            style={{
+                              backgroundColor: '#27272a',
+                              color: '#f87171',
+                              border: '1px solid #3f3f46',
+                              borderRadius: '6px',
+                              padding: '0.5rem 0.85rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: isDeletingThis ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ef4444';
+                              e.currentTarget.style.color = '#ffffff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#27272a';
+                              e.currentTarget.style.color = '#f87171';
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>{isDeletingThis ? 'Deleting...' : 'Delete User'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         )}
 
 

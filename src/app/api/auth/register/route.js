@@ -44,11 +44,11 @@ export async function POST(request) {
       );
     }
 
-    // Create user with email_confirm: true to bypass Resend unverified domain constraints during development
+    // Create user with email_confirm: false so email verification is strictly required
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim().toLowerCase(),
       password,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: {
         ...metadata,
         full_name: metadata.full_name || metadata.name || ''

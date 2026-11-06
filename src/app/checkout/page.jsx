@@ -70,10 +70,22 @@ export default function CheckoutPage() {
     pincode: ''
   });
 
-  // If bag contains the test jersey (price <= 10) or subtotal >= 999, waive shipping fee
-  const isTestItemOnly = cartItems.length > 0 && cartItems.every(i => (i.product?.price || 0) <= 10);
+  // Postal Shipping Method State: 'normal' (India Post ₹50) | 'speed' (EMS Speed Post ₹70) | 'test_free' (₹0 Test Mode)
+  const [shippingMethod, setShippingMethod] = useState('normal');
+
   const hasTestItem = cartItems.some(i => (i.product?.price || 0) <= 10);
-  const shippingFee = (subtotal >= FREE_SHIPPING_THRESHOLD || isTestItemOnly) ? 0 : 70;
+
+  let shippingFee = 50;
+  let shippingMethodName = 'India Post Normal (₹50)';
+
+  if (shippingMethod === 'speed') {
+    shippingFee = 70;
+    shippingMethodName = 'EMS Speed Post (₹70)';
+  } else if (shippingMethod === 'test_free') {
+    shippingFee = 0;
+    shippingMethodName = 'Test Free Shipping (₹0)';
+  }
+
   const totalAmount = subtotal + shippingFee;
 
   const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
@@ -207,7 +219,8 @@ export default function CheckoutPage() {
             address: form.address.trim(),
             city: form.city.trim(),
             state: form.state,
-            pincode: form.pincode.trim()
+            pincode: form.pincode.trim(),
+            shipping_method: shippingMethodName
           },
           userId: user?.id || null,
           subtotal,
@@ -341,7 +354,8 @@ export default function CheckoutPage() {
             address: resolvedForm.address,
             city: resolvedForm.city,
             state: resolvedForm.state,
-            pincode: resolvedForm.pincode
+            pincode: resolvedForm.pincode,
+            shipping_method: shippingMethodName
           },
           userId: user?.id || null,
           subtotal,
@@ -376,7 +390,8 @@ export default function CheckoutPage() {
             address: resolvedForm.address,
             city: resolvedForm.city,
             state: resolvedForm.state,
-            pincode: resolvedForm.pincode
+            pincode: resolvedForm.pincode,
+            shipping_method: shippingMethodName
           },
           subtotal,
           shippingFee,
@@ -550,6 +565,110 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Postal Shipping Method Selection */}
+              <div style={{ marginTop: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#444', marginBottom: '0.5rem' }}>
+                  Delivery Partner & Speed *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                  {/* Option 1: Normal India Post (₹50) */}
+                  <div
+                    onClick={() => setShippingMethod('normal')}
+                    style={{
+                      border: shippingMethod === 'normal' ? '2px solid #09090b' : '1px solid #d4d4d8',
+                      backgroundColor: shippingMethod === 'normal' ? '#f8fafc' : '#ffffff',
+                      borderRadius: '8px',
+                      padding: '0.875rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <input
+                          type="radio"
+                          name="shippingMethod"
+                          checked={shippingMethod === 'normal'}
+                          onChange={() => setShippingMethod('normal')}
+                          style={{ accentColor: '#09090b', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800 }}>India Post</span>
+                      </div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#09090b' }}>
+                        ₹50
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', paddingLeft: '1.25rem' }}>
+                      Normal Registered Post (5–7 days)
+                    </div>
+                  </div>
+
+                  {/* Option 2: EMS Speed Post (₹70) */}
+                  <div
+                    onClick={() => setShippingMethod('speed')}
+                    style={{
+                      border: shippingMethod === 'speed' ? '2px solid #09090b' : '1px solid #d4d4d8',
+                      backgroundColor: shippingMethod === 'speed' ? '#f8fafc' : '#ffffff',
+                      borderRadius: '8px',
+                      padding: '0.875rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <input
+                          type="radio"
+                          name="shippingMethod"
+                          checked={shippingMethod === 'speed'}
+                          onChange={() => setShippingMethod('speed')}
+                          style={{ accentColor: '#09090b', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800 }}>EMS Speed Post</span>
+                      </div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#09090b' }}>
+                        ₹70
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', paddingLeft: '1.25rem' }}>
+                      Express Priority Delivery (2–4 days)
+                    </div>
+                  </div>
+
+                  {/* Option 3: Test Free Shipping (₹0 only for testing) */}
+                  <div
+                    onClick={() => setShippingMethod('test_free')}
+                    style={{
+                      border: shippingMethod === 'test_free' ? '2px solid #f59e0b' : '1px dashed #d4d4d8',
+                      backgroundColor: shippingMethod === 'test_free' ? '#fffbeb' : '#fafafa',
+                      borderRadius: '8px',
+                      padding: '0.875rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <input
+                          type="radio"
+                          name="shippingMethod"
+                          checked={shippingMethod === 'test_free'}
+                          onChange={() => setShippingMethod('test_free')}
+                          style={{ accentColor: '#f59e0b', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#b45309' }}>Test Free Shipping</span>
+                      </div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#16a34a' }}>
+                        ₹0
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#92400e', paddingLeft: '1.25rem' }}>
+                      Free delivery option for checkout testing
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Payment Option Card */}
               <div style={{ marginTop: '0.5rem', padding: '1rem', border: '2px solid #09090b', borderRadius: '8px', backgroundColor: '#fcfcfc' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -705,7 +824,7 @@ export default function CheckoutPage() {
             {hasTestItem && (
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Zap size={13} color="#16a34a" />
-                <span>₹1 Test Kit active: Express Courier shipping is 100% free!</span>
+                <span>₹1 Test Kit in bag. Select &quot;Test Free Shipping (₹0)&quot; or Postal Delivery to proceed.</span>
               </div>
             )}
 
@@ -740,7 +859,7 @@ export default function CheckoutPage() {
                 <span>₹{subtotal}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#555' }}>
-                <span>Express Courier Shipping</span>
+                <span>Delivery ({shippingMethod === 'speed' ? 'EMS Speed Post' : (shippingMethod === 'test_free' ? 'Test Free Shipping' : 'India Post Normal')})</span>
                 <span>{shippingFee === 0 ? <strong style={{ color: '#16a34a' }}>FREE</strong> : `₹${shippingFee}`}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.125rem', fontWeight: 800, color: '#09090b', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px dashed #d4d4d8' }}>

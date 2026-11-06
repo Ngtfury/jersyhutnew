@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, ShoppingBag, MessageCircle, ArrowRight, Package, Truck, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ShoppingBag, Mail, ArrowRight, Package, Truck, ShieldCheck } from 'lucide-react';
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -24,9 +24,6 @@ function OrderSuccessContent() {
     }
   }, [orderNumber]);
 
-  const whatsappMessage = encodeURIComponent(`Hi Matchday Team! I just placed an order on your store.\n\nOrder Number: ${orderNumber}\nPayment ID: ${paymentId}\n\nPlease confirm shipment!`);
-  const whatsappUrl = `https://wa.me/919072748730?text=${whatsappMessage}`;
-
   return (
     <div style={{ minHeight: '85vh', backgroundColor: '#fafafa', padding: '3rem 1rem 6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ maxWidth: '640px', width: '100%', backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '16px', padding: '2.5rem 2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', textAlign: 'center' }}>
@@ -45,11 +42,11 @@ function OrderSuccessContent() {
         </h1>
 
         <p style={{ fontSize: '0.875rem', color: '#666', lineHeight: 1.5, margin: '0 auto 2rem', maxWidth: '460px' }}>
-          Thank you for choosing Matchday. Your payment via Razorpay has been processed securely, and your matchday order is dispatched via express courier.
+          Thank you for choosing Matchday. Your payment via Razorpay has been processed securely, and your jersey order is queued for fulfillment.
         </p>
 
         {/* Order Reference Box */}
-        <div style={{ backgroundColor: '#f4f4f5', borderRadius: '10px', padding: '1.25rem', marginBottom: '2rem', textAlign: 'left' }}>
+        <div style={{ backgroundColor: '#f4f4f5', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem', textAlign: 'left' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #e4e4e7', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 600 }}>Order Number</span>
             <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#09090b', fontFamily: 'monospace' }}>{orderNumber}</span>
@@ -61,37 +58,38 @@ function OrderSuccessContent() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 600 }}>Delivery Mode</span>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Truck size={14} /> Express Air Shipping (3-5 Days)
+              <Truck size={14} /> {orderDetails?.customer?.shipping_method || orderDetails?.shippingMethod || 'Postal Courier Delivery'}
             </span>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.6rem',
-              backgroundColor: '#25D366',
-              color: '#ffffff',
-              padding: '0.875rem 1.5rem',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              textDecoration: 'none',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}
-          >
-            <MessageCircle size={18} />
-            <span>Get Tracking Updates on WhatsApp</span>
-          </a>
+        {/* Email Tracking Notice Box */}
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '10px',
+          padding: '1.15rem 1.25rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.85rem',
+          textAlign: 'left'
+        }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#16a34a' }}>
+            <Mail size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#14532d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Tracking Link Available on Email
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: '#166534', marginTop: '0.25rem', lineHeight: 1.45 }}>
+              Your official tracking ID and tracking link will be available on your registered email shortly once your kit is dispatched.
+            </div>
+          </div>
+        </div>
 
+        {/* Action Button */}
+        <div>
           <Link
             href="/collections/all"
             style={{
@@ -101,7 +99,7 @@ function OrderSuccessContent() {
               gap: '0.5rem',
               backgroundColor: '#09090b',
               color: '#ffffff',
-              padding: '0.875rem 1.5rem',
+              padding: '0.9rem 1.5rem',
               borderRadius: '8px',
               fontWeight: 700,
               fontSize: '0.875rem',
