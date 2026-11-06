@@ -267,7 +267,23 @@ export default function CheckoutPage() {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 orderNumber: orderData.orderNumber,
-                items: cartItems
+                items: cartItems,
+                customer: {
+                  name: form.name.trim(),
+                  phone: form.phone.trim(),
+                  email: form.email.trim()
+                },
+                shippingAddress: {
+                  address: form.address.trim(),
+                  city: form.city.trim(),
+                  state: form.state,
+                  pincode: form.pincode.trim(),
+                  shipping_method: shippingMethodName
+                },
+                userId: user?.id || null,
+                subtotal,
+                shippingFee,
+                totalAmount
               })
             });
 
@@ -320,7 +336,7 @@ export default function CheckoutPage() {
     // Auto-fill sensible test details if fields are currently blank so the test button ALWAYS works
     const customerName = form.name.trim() || user?.user_metadata?.full_name || 'Matchday Test Customer';
     const customerPhone = form.phone.trim().replace(/\D/g, '').length >= 10 ? form.phone.trim() : '9072748730';
-    const customerEmail = form.email.trim() || user?.email || 'matchdayjerseysindia@gmail.com';
+    const customerEmail = form.email.trim() || user?.email || '';
     const deliveryAddress = form.address.trim() || 'Matchday Test Arena, 42 Heritage Lane';
     const deliveryCity = form.city.trim() || 'Kochi';
     const deliveryState = form.state || 'Kerala';

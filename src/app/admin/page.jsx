@@ -738,7 +738,7 @@ export default function AdminPage() {
 
       const emailNote = data.emailSent 
         ? ` Customer tracking email sent to ${order.customer_email || 'customer'}!`
-        : ` (Store notification sent)`;
+        : '';
       showToast(`Order ${order.order_number} marked as SHIPPED!${emailNote}`, 'success');
     } catch (err) {
       console.error('Shipment error:', err);

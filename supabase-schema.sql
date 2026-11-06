@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tracking_id TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tracking_url TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS courier_name TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS user_id UUID;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders (created_at DESC);

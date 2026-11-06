@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../../../lib/supabase';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vbahumjewlpodkuktzqb.supabase.co';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+function getSupabaseClient() {
+  if (serviceRoleKey) {
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+  }
+  return supabase;
+}
 
 function getRazorpayInstance() {
   const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
@@ -31,18 +44,25 @@ export async function POST(request) {
     // Generate human-readable Matchday order number: e.g. MD-849201
     const orderNumber = `MD-${Date.now().toString().slice(-5)}-${Math.floor(100 + Math.random() * 900)}`;
 
+    const dbClient = getSupabaseClient();
+    const resolvedAddress = {
+      ...(shippingAddress || {}),
+      user_id: userId || null
+    };
+
     // Mode 1: Simulated Test Order (skips external Razorpay API, generates instant test order)
     if (is_simulated) {
       const simulatedOrderId = `order_sim_${Date.now()}`;
 
-      if (supabase) {
+      if (dbClient) {
         try {
           const orderPayload = {
             order_number: orderNumber,
             customer_name: customer?.name || 'Matchday Test Customer',
             customer_email: customer?.email || null,
             customer_phone: customer?.phone || '',
-            shipping_address: shippingAddress || {},
+            shipping_address: resolvedAddress,
+            user_id: userId || null,
             items: items || [],
             subtotal: Number(subtotal || totalAmount),
             shipping_fee: Number(shippingFee || 0),
@@ -54,11 +74,10 @@ export async function POST(request) {
             created_at: new Date().toISOString()
           };
 
-          if (userId) {
-            orderPayload.user_id = userId;
+          const { error: insErr } = await dbClient.from('orders').insert(orderPayload);
+          if (insErr) {
+            console.error('⚠️ Supabase simulated order record insertion error:', insErr);
           }
-
-          await supabase.from('orders').insert(orderPayload);
         } catch (dbErr) {
           console.warn('⚠️ Supabase simulated order record insertion notice:', dbErr?.message || dbErr);
         }
@@ -95,14 +114,15 @@ export async function POST(request) {
     const razorpayOrder = await razorpay.orders.create(razorpayOptions);
 
     // Persist pending order to Supabase orders table
-    if (supabase) {
+    if (dbClient) {
       try {
         const orderPayload = {
           order_number: orderNumber,
           customer_name: customer?.name || 'Customer',
           customer_email: customer?.email || null,
           customer_phone: customer?.phone || '',
-          shipping_address: shippingAddress || {},
+          shipping_address: resolvedAddress,
+          user_id: userId || null,
           items: items || [],
           subtotal: Number(subtotal || totalAmount),
           shipping_fee: Number(shippingFee || 0),
@@ -114,11 +134,10 @@ export async function POST(request) {
           created_at: new Date().toISOString()
         };
 
-        if (userId) {
-          orderPayload.user_id = userId;
+        const { error: insErr } = await dbClient.from('orders').insert(orderPayload);
+        if (insErr) {
+          console.error('⚠️ Supabase live order record insertion error:', insErr);
         }
-
-        await supabase.from('orders').insert(orderPayload);
       } catch (dbErr) {
         console.warn('⚠️ Supabase order record insertion notice:', dbErr?.message || dbErr);
       }
@@ -139,7 +158,7 @@ export async function POST(request) {
 
     let friendlyMessage = rzpDesc || 'Failed to initialize payment gateway';
     if (statusCode === 401 || (typeof rzpDesc === 'string' && rzpDesc.toLowerCase().includes('auth'))) {
-      friendlyMessage = 'Razorpay Authentication Failed (401): Please check your Razorpay Key ID and Secret in .env.local. In the Razorpay Dashboard (Test Mode), generate a new Test Key under Account & Settings > API Keys and update .env.local.';
+      friendlyMessage = 'Razorpay Authentication Failed (401): Please check your Razorpay Key ID and Secret in .env.local.';
     }
 
     return NextResponse.json(

@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../../../lib/supabase';
 import { sendOrderShippedEmail } from '../../../../lib/email';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vbahumjewlpodkuktzqb.supabase.co';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+function getSupabaseClient() {
+  if (serviceRoleKey) {
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+  }
+  return supabase;
+}
 
 export async function POST(request) {
   try {
@@ -26,7 +39,8 @@ export async function POST(request) {
     const cleanTrackingUrl = (trackingUrl || '').trim();
     const shippedAt = new Date().toISOString();
 
-    if (!supabase) {
+    const dbClient = getSupabaseClient();
+    if (!dbClient) {
       return NextResponse.json(
         { error: 'Database connection is unavailable' },
         { status: 500 }
@@ -34,7 +48,7 @@ export async function POST(request) {
     }
 
     // 1. Fetch current order from Supabase
-    let query = supabase.from('orders').select('*');
+    let query = dbClient.from('orders').select('*');
     if (orderId) {
       query = query.eq('id', orderId);
     } else {
@@ -49,7 +63,7 @@ export async function POST(request) {
       );
     }
 
-    // 2. Prepare merged shipping_address JSONB
+    // 2. Prepare merged shipping_address JSONB containing tracking & courier details
     const currentAddress = (order.shipping_address && typeof order.shipping_address === 'object')
       ? order.shipping_address
       : {};
@@ -62,42 +76,24 @@ export async function POST(request) {
       shipped_at: shippedAt
     };
 
-    // 3. Update Supabase order
+    // 3. Update Supabase order status & shipping details
     let updatedOrder = null;
     try {
-      // First attempt: update status, shipping_address JSONB, and top-level columns if they exist
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from('orders')
         .update({
           status: 'shipped',
+          shipping_address: updatedAddress,
           courier_name: cleanCourier,
           tracking_id: cleanTrackingId,
-          tracking_url: cleanTrackingUrl,
-          shipping_address: updatedAddress
+          tracking_url: cleanTrackingUrl
         })
         .eq('id', order.id)
         .select()
         .single();
 
-      if (error) {
-        // If top-level columns are not created in PostgreSQL table yet,
-        // safely update status and shipping_address JSONB
-        console.warn('Notice: Updating status and shipping_address JSONB (top-level columns optional):', error.message);
-        const { data: fbData, error: fbErr } = await supabase
-          .from('orders')
-          .update({
-            status: 'shipped',
-            shipping_address: updatedAddress
-          })
-          .eq('id', order.id)
-          .select()
-          .single();
-
-        if (fbErr) throw fbErr;
-        updatedOrder = fbData;
-      } else {
-        updatedOrder = data;
-      }
+      if (error) throw error;
+      updatedOrder = data;
     } catch (dbErr) {
       console.error('Failed to update order status in Supabase:', dbErr);
       return NextResponse.json(
@@ -127,7 +123,7 @@ export async function POST(request) {
       // Mark shipped_email_sent in shipping_address JSONB if email succeeded
       if (emailResult.success) {
         try {
-          await supabase
+          await dbClient
             .from('orders')
             .update({
               shipping_address: {

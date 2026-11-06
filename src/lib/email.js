@@ -1,10 +1,123 @@
 import { Resend } from 'resend';
 
 const resendApiKey = process.env.RESEND_API_KEY || '';
-export const resend = new Resend(resendApiKey);
+export const resend = new Resend(resendApiKey || 're_placeholder_key');
 
 export const DEFAULT_STORE_EMAIL = process.env.STORE_NOTIFICATION_EMAIL || 'matchdayjerseysindia@gmail.com';
 export const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Matchday Jerseys <orders@matchdayjerseys.com>';
+
+/**
+ * Safely extracts and normalizes customer name, phone, email, and shipping address from an order object.
+ */
+export function resolveOrderDetails(order = {}) {
+  let addressObj = {};
+  if (typeof order.shipping_address === 'string') {
+    try {
+      addressObj = JSON.parse(order.shipping_address);
+    } catch (e) {
+      addressObj = {};
+    }
+  } else if (order.shipping_address && typeof order.shipping_address === 'object') {
+    addressObj = order.shipping_address;
+  }
+
+  // Address fields can be directly on addressObj or under nested shippingAddress
+  const nested = (addressObj.shippingAddress && typeof addressObj.shippingAddress === 'object')
+    ? addressObj.shippingAddress
+    : {};
+
+  const addressLine = (
+    addressObj.address ||
+    addressObj.address_line ||
+    addressObj.street ||
+    addressObj.line1 ||
+    nested.address ||
+    nested.address_line ||
+    ''
+  ).trim();
+
+  const city = (
+    addressObj.city ||
+    addressObj.district ||
+    nested.city ||
+    ''
+  ).trim();
+
+  const state = (
+    addressObj.state ||
+    nested.state ||
+    ''
+  ).trim();
+
+  const pincode = (
+    addressObj.pincode ||
+    addressObj.postal_code ||
+    addressObj.zip ||
+    nested.pincode ||
+    ''
+  ).trim();
+
+  const shippingMethod = (
+    addressObj.shipping_method ||
+    addressObj.delivery_method ||
+    nested.shipping_method ||
+    ''
+  ).trim();
+
+  // Resolve Customer Name (never default to 'Valued Customer')
+  let customerName = (order.customer_name || '').trim();
+  if (!customerName || customerName.toLowerCase() === 'valued customer' || customerName.toLowerCase() === 'customer') {
+    customerName = (
+      order.customer?.name ||
+      addressObj.customer_name ||
+      addressObj.name ||
+      nested.name ||
+      nested.customer_name ||
+      ''
+    ).trim();
+  }
+  // If still empty, use email prefix or default
+  if (!customerName) {
+    const emailToUse = order.customer_email || order.customer?.email || addressObj.email || '';
+    if (emailToUse && emailToUse.includes('@')) {
+      const prefix = emailToUse.split('@')[0];
+      customerName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    } else {
+      customerName = 'Customer';
+    }
+  }
+
+  // Resolve Customer Phone
+  const customerPhone = (
+    order.customer_phone ||
+    order.customer?.phone ||
+    addressObj.phone ||
+    addressObj.contact ||
+    nested.phone ||
+    ''
+  ).trim();
+
+  // Resolve Customer Email
+  const customerEmail = (
+    order.customer_email ||
+    order.customer?.email ||
+    addressObj.email ||
+    nested.email ||
+    ''
+  ).trim();
+
+  return {
+    customerName,
+    customerPhone,
+    customerEmail,
+    addressLine,
+    city,
+    state,
+    pincode,
+    shippingMethod,
+    parsedAddress: addressObj
+  };
+}
 
 /**
  * Builds a clean, responsive HTML email template for confirmed Matchday orders.
@@ -12,10 +125,6 @@ export const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Matchday Jer
 export function buildOrderConfirmationHtml(order) {
   const {
     order_number = 'MD-ORDER',
-    customer_name = 'Customer',
-    customer_phone = '',
-    customer_email = '',
-    shipping_address = {},
     items = [],
     subtotal = 0,
     shipping_fee = 0,
@@ -24,16 +133,23 @@ export function buildOrderConfirmationHtml(order) {
     created_at = new Date().toISOString()
   } = order;
 
+  const {
+    customerName,
+    customerPhone,
+    addressLine,
+    city,
+    state,
+    pincode,
+    shippingMethod
+  } = resolveOrderDetails(order);
+
   const orderDate = new Date(created_at).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
 
-  const addressLine = shipping_address.address || '';
-  const city = shipping_address.city || '';
-  const state = shipping_address.state || '';
-  const pincode = shipping_address.pincode || '';
+  const hasDestination = Boolean(addressLine || city || pincode);
 
   const itemsHtml = Array.isArray(items)
     ? items.map(item => {
@@ -104,7 +220,7 @@ export function buildOrderConfirmationHtml(order) {
           <tr>
             <td style="padding: 24px 30px; border-bottom: 1px solid #27272a;">
               <h1 style="font-size: 18px; font-weight: 800; text-transform: uppercase; margin: 0 0 8px; color: #ffffff; letter-spacing: 0.02em;">
-                Thank You For Your Order, ${customer_name}!
+                Thank You For Your Order, ${customerName}!
               </h1>
               <p style="font-size: 13px; color: #a1a1aa; line-height: 1.5; margin: 0;">
                 Your payment has been successfully verified via Razorpay. Your official matchday kit is now scheduled for priority quality check and dispatch.
@@ -145,11 +261,16 @@ export function buildOrderConfirmationHtml(order) {
                 Delivery Destination
               </div>
               <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">
-                ${customer_name} &bull; ${customer_phone}
+                ${customerName}${customerPhone ? ` &bull; ${customerPhone}` : ''}
               </div>
-              <div style="font-size: 13px; color: #a1a1aa; line-height: 1.5;">
-                ${addressLine}<br />
-                ${city}, ${state} - <strong>${pincode}</strong>
+              <div style="font-size: 13px; color: #d4d4d8; line-height: 1.6;">
+                ${hasDestination ? `
+                  ${addressLine ? `<div>${addressLine}</div>` : ''}
+                  <div>${[city, state].filter(Boolean).join(', ')}${pincode ? ` - <strong style="color: #ffffff;">${pincode}</strong>` : ''}</div>
+                  ${shippingMethod ? `<div style="margin-top: 6px; font-size: 11px; color: #4ade80; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Shipping Method: ${shippingMethod}</div>` : ''}
+                ` : `
+                  <div style="color: #71717a; font-style: italic;">Address confirmed on order file. Contact support if you need to modify delivery details.</div>
+                `}
               </div>
             </td>
           </tr>
@@ -171,7 +292,7 @@ export function buildOrderConfirmationHtml(order) {
                   <td align="right" style="font-size: 13px; color: #e4e4e7; padding: 4px 0;">&#8377;${subtotal}</td>
                 </tr>
                 <tr>
-                  <td style="font-size: 13px; color: #a1a1aa; padding: 4px 0;">Express Courier Shipping</td>
+                  <td style="font-size: 13px; color: #a1a1aa; padding: 4px 0;">Shipping Fee ${shippingMethod ? `(${shippingMethod})` : ''}</td>
                   <td align="right" style="font-size: 13px; color: #4ade80; padding: 4px 0; font-weight: 700;">
                     ${Number(shipping_fee) === 0 ? 'FREE' : `&#8377;${shipping_fee}`}
                   </td>
@@ -222,15 +343,22 @@ export function buildOrderConfirmationHtml(order) {
 export function buildOrderConfirmationText(order) {
   const {
     order_number = 'MD-ORDER',
-    customer_name = 'Customer',
-    customer_phone = '',
-    shipping_address = {},
     items = [],
     subtotal = 0,
     shipping_fee = 0,
     total_amount = 0,
     razorpay_payment_id = '',
   } = order;
+
+  const {
+    customerName,
+    customerPhone,
+    addressLine,
+    city,
+    state,
+    pincode,
+    shippingMethod
+  } = resolveOrderDetails(order);
 
   const itemsList = Array.isArray(items)
     ? items.map(i => {
@@ -242,10 +370,15 @@ export function buildOrderConfirmationText(order) {
       }).join('\n')
     : '';
 
+  const destinationText = [
+    addressLine,
+    [city, state].filter(Boolean).join(', ') + (pincode ? ` - ${pincode}` : '')
+  ].filter(Boolean).join('\n') || 'Address on file';
+
   return `MATCHDAY - ORDER CONFIRMATION
 ========================================
 Order Number: ${order_number}
-Customer: ${customer_name} (${customer_phone})
+Customer: ${customerName}${customerPhone ? ` (${customerPhone})` : ''}
 Payment Status: PAID VIA RAZORPAY
 Transaction ID: ${razorpay_payment_id || 'N/A'}
 
@@ -253,12 +386,11 @@ ITEMS ORDERED:
 ${itemsList}
 
 Subtotal: ₹${subtotal}
-Shipping: ${Number(shipping_fee) === 0 ? 'FREE' : `₹${shipping_fee}`}
+Shipping Fee: ${Number(shipping_fee) === 0 ? 'FREE' : `₹${shipping_fee}`} ${shippingMethod ? `(${shippingMethod})` : ''}
 Total Amount: ₹${total_amount}
 
 DELIVERY DESTINATION:
-${shipping_address.address || ''}
-${shipping_address.city || ''}, ${shipping_address.state || ''} - ${shipping_address.pincode || ''}
+${destinationText}
 
 WhatsApp Support: +91 90727 48730
 Matchday Official Store
@@ -266,7 +398,8 @@ Matchday Official Store
 }
 
 /**
- * Sends order confirmation emails to the store owner and customer.
+ * Sends order confirmation email strictly to the customer.
+ * NO copy or duplicate notification is sent to store owner email.
  */
 export async function sendOrderConfirmationEmail(order) {
   if (!order || !order.order_number) {
@@ -274,42 +407,37 @@ export async function sendOrderConfirmationEmail(order) {
     return { success: false, error: 'Missing order' };
   }
 
+  const { customerEmail, customerName } = resolveOrderDetails(order);
+
+  if (!customerEmail) {
+    console.warn(`sendOrderConfirmationEmail: No customer email found for order ${order.order_number}. Email skipped.`);
+    return { success: false, error: 'No customer email provided' };
+  }
+
   const html = buildOrderConfirmationHtml(order);
   const text = buildOrderConfirmationText(order);
-  const subject = `Order Confirmed: ${order.order_number} (${order.customer_name}) - Matchday`;
-  const results = [];
+  const subject = `Your Matchday Order ${order.order_number} is Confirmed!`;
 
-  // 1. Send store notification (guaranteed delivery to verified owner address)
   try {
-    const storeNotification = await resend.emails.send({
+    const customerEmailRes = await resend.emails.send({
       from: DEFAULT_FROM_EMAIL,
-      to: DEFAULT_STORE_EMAIL,
-      subject: `🚨 New Order Confirmed: ${order.order_number} (₹${order.total_amount})`,
+      to: customerEmail,
+      subject,
       html,
       text
     });
-    results.push({ recipient: DEFAULT_STORE_EMAIL, success: !storeNotification.error, data: storeNotification.data, error: storeNotification.error });
-  } catch (err) {
-    console.warn('Failed to send store order notification email:', err.message || err);
-  }
 
-  // 2. Send customer confirmation email if email was provided and differs from store email
-  if (order.customer_email && order.customer_email.trim().toLowerCase() !== DEFAULT_STORE_EMAIL.toLowerCase()) {
-    try {
-      const customerEmailRes = await resend.emails.send({
-        from: DEFAULT_FROM_EMAIL,
-        to: order.customer_email.trim(),
-        subject: `Your Matchday Order ${order.order_number} is Confirmed!`,
-        html,
-        text
-      });
-      results.push({ recipient: order.customer_email, success: !customerEmailRes.error, data: customerEmailRes.data, error: customerEmailRes.error });
-    } catch (custErr) {
-      console.warn('Customer email delivery notice:', custErr.message || custErr);
+    if (customerEmailRes.error) {
+      console.error(`⚠️ Customer email delivery error to ${customerEmail}:`, customerEmailRes.error);
+      return { success: false, recipient: customerEmail, error: customerEmailRes.error };
     }
-  }
 
-  return { success: true, results };
+    console.log(`✅ Order confirmation email successfully sent to customer: ${customerEmail} (${order.order_number})`);
+    return { success: true, recipient: customerEmail, data: customerEmailRes.data };
+  } catch (custErr) {
+    console.error(`⚠️ Customer email dispatch exception to ${customerEmail}:`, custErr?.message || custErr);
+    return { success: false, recipient: customerEmail, error: custErr?.message || custErr };
+  }
 }
 
 /**
@@ -318,20 +446,25 @@ export async function sendOrderConfirmationEmail(order) {
 export function buildOrderShippedHtml(order, trackingInfo = {}) {
   const {
     order_number = 'MD-ORDER',
-    customer_name = 'Customer',
-    customer_phone = '',
-    shipping_address = {},
     items = []
   } = order;
 
-  const tracking_id = trackingInfo.tracking_id || order.tracking_id || order.shipping_address?.tracking_id || '';
-  const tracking_url = trackingInfo.tracking_url || order.tracking_url || order.shipping_address?.tracking_url || '';
-  const courier_name = trackingInfo.courier_name || order.courier_name || order.shipping_address?.courier_name || 'Express Courier';
+  const {
+    customerName,
+    customerPhone,
+    addressLine,
+    city,
+    state,
+    pincode,
+    shippingMethod,
+    parsedAddress
+  } = resolveOrderDetails(order);
 
-  const addressLine = shipping_address.address || '';
-  const city = shipping_address.city || '';
-  const state = shipping_address.state || '';
-  const pincode = shipping_address.pincode || '';
+  const tracking_id = trackingInfo.tracking_id || order.tracking_id || parsedAddress.tracking_id || '';
+  const tracking_url = trackingInfo.tracking_url || order.tracking_url || parsedAddress.tracking_url || '';
+  const courier_name = trackingInfo.courier_name || order.courier_name || parsedAddress.courier_name || 'Express Courier';
+
+  const hasDestination = Boolean(addressLine || city || pincode);
 
   const itemsHtml = Array.isArray(items)
     ? items.map(item => {
@@ -396,7 +529,7 @@ export function buildOrderShippedHtml(order, trackingInfo = {}) {
           <tr>
             <td style="padding: 24px 30px; border-bottom: 1px solid #27272a;">
               <h1 style="font-size: 18px; font-weight: 800; text-transform: uppercase; margin: 0 0 8px; color: #ffffff; letter-spacing: 0.02em;">
-                Great News, ${customer_name}!
+                Great News, ${customerName}!
               </h1>
               <p style="font-size: 13px; color: #a1a1aa; line-height: 1.5; margin: 0;">
                 Your official matchday order <strong>${order_number}</strong> has been handed over to <strong>${courier_name}</strong> and is currently en route to your doorstep.
@@ -438,11 +571,16 @@ export function buildOrderShippedHtml(order, trackingInfo = {}) {
                 Delivery Destination
               </div>
               <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">
-                ${customer_name} &bull; ${customer_phone}
+                ${customerName}${customerPhone ? ` &bull; ${customerPhone}` : ''}
               </div>
-              <div style="font-size: 13px; color: #a1a1aa; line-height: 1.5;">
-                ${addressLine}<br />
-                ${city}, ${state} - <strong>${pincode}</strong>
+              <div style="font-size: 13px; color: #d4d4d8; line-height: 1.6;">
+                ${hasDestination ? `
+                  ${addressLine ? `<div>${addressLine}</div>` : ''}
+                  <div>${[city, state].filter(Boolean).join(', ')}${pincode ? ` - <strong style="color: #ffffff;">${pincode}</strong>` : ''}</div>
+                  ${shippingMethod ? `<div style="margin-top: 6px; font-size: 11px; color: #4ade80; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Shipping Method: ${shippingMethod}</div>` : ''}
+                ` : `
+                  <div style="color: #71717a; font-style: italic;">Address confirmed on order file.</div>
+                `}
               </div>
             </td>
           </tr>
@@ -497,15 +635,23 @@ export function buildOrderShippedHtml(order, trackingInfo = {}) {
 export function buildOrderShippedText(order, trackingInfo = {}) {
   const {
     order_number = 'MD-ORDER',
-    customer_name = 'Customer',
-    customer_phone = '',
-    shipping_address = {},
     items = []
   } = order;
 
-  const tracking_id = trackingInfo.tracking_id || order.tracking_id || order.shipping_address?.tracking_id || '';
-  const tracking_url = trackingInfo.tracking_url || order.tracking_url || order.shipping_address?.tracking_url || '';
-  const courier_name = trackingInfo.courier_name || order.courier_name || order.shipping_address?.courier_name || 'Express Courier';
+  const {
+    customerName,
+    customerPhone,
+    addressLine,
+    city,
+    state,
+    pincode,
+    shippingMethod,
+    parsedAddress
+  } = resolveOrderDetails(order);
+
+  const tracking_id = trackingInfo.tracking_id || order.tracking_id || parsedAddress.tracking_id || '';
+  const tracking_url = trackingInfo.tracking_url || order.tracking_url || parsedAddress.tracking_url || '';
+  const courier_name = trackingInfo.courier_name || order.courier_name || parsedAddress.courier_name || 'Express Courier';
 
   const itemsList = Array.isArray(items)
     ? items.map(i => {
@@ -516,37 +662,48 @@ export function buildOrderShippedText(order, trackingInfo = {}) {
       }).join('\n')
     : '';
 
+  const destinationText = [
+    addressLine,
+    [city, state].filter(Boolean).join(', ') + (pincode ? ` - ${pincode}` : '')
+  ].filter(Boolean).join('\n') || 'Address on file';
+
   return `MATCHDAY - ORDER SHIPPED
 ========================================
 Order Number: ${order_number}
-Customer: ${customer_name} (${customer_phone})
+Customer: ${customerName}${customerPhone ? ` (${customerPhone})` : ''}
 
 CONSIGNMENT TRACKING:
 Courier Partner: ${courier_name}
-Tracking ID (AWB): ${tracking_id}
+Tracking ID (AWB): ${tracking_id || 'Will update shortly'}
 Tracking Link: ${tracking_url || 'N/A'}
 
 ITEMS IN SHIPMENT:
 ${itemsList}
 
 DELIVERY DESTINATION:
-${shipping_address.address || ''}
-${shipping_address.city || ''}, ${shipping_address.state || ''} - ${shipping_address.pincode || ''}
-
+${destinationText}
+${shippingMethod ? `Shipping Method: ${shippingMethod}\n` : ''}
 WhatsApp Customer Support: +91 90727 48730
 Matchday Official Store
 `;
 }
 
 /**
- * Sends order shipped & tracking email to the customer.
+ * Sends order shipped & tracking email strictly to the customer.
+ * NO copy or duplicate notification is sent to store owner email.
  */
 export async function sendOrderShippedEmail(order, trackingInfo = {}) {
   if (!order || !order.order_number) {
     return { success: false, error: 'Missing order details' };
   }
 
-  const recipient = order.customer_email || DEFAULT_STORE_EMAIL;
+  const { customerEmail, customerName } = resolveOrderDetails(order);
+
+  if (!customerEmail) {
+    console.warn(`sendOrderShippedEmail: No customer email found for order ${order.order_number}. Shipped email skipped.`);
+    return { success: false, error: 'No customer email provided' };
+  }
+
   const html = buildOrderShippedHtml(order, trackingInfo);
   const text = buildOrderShippedText(order, trackingInfo);
   const subject = `🚚 Your Matchday Order ${order.order_number} Has Been Shipped!`;
@@ -554,29 +711,21 @@ export async function sendOrderShippedEmail(order, trackingInfo = {}) {
   try {
     const res = await resend.emails.send({
       from: DEFAULT_FROM_EMAIL,
-      to: recipient,
+      to: customerEmail,
       subject,
       html,
       text
     });
 
-    // Also notify store owner if customer was emailed
-    if (order.customer_email && order.customer_email.trim().toLowerCase() !== DEFAULT_STORE_EMAIL.toLowerCase()) {
-      try {
-        await resend.emails.send({
-          from: DEFAULT_FROM_EMAIL,
-          to: DEFAULT_STORE_EMAIL,
-          subject: `🚚 Shipped Notification Copy: ${order.order_number} (${trackingInfo.tracking_id || 'No AWB'})`,
-          html,
-          text
-        });
-      } catch (e) {}
+    if (res.error) {
+      console.error(`⚠️ Failed to send shipping email to ${customerEmail}:`, res.error);
+      return { success: false, recipient: customerEmail, error: res.error };
     }
 
-    return { success: !res.error, data: res.data, error: res.error };
+    console.log(`✅ Shipped tracking email successfully sent to customer: ${customerEmail} (${order.order_number})`);
+    return { success: true, recipient: customerEmail, data: res.data };
   } catch (err) {
-    console.error('Failed to send shipped tracking email:', err);
-    return { success: false, error: err.message || err };
+    console.error(`⚠️ Failed to send shipped tracking email to ${customerEmail}:`, err?.message || err);
+    return { success: false, recipient: customerEmail, error: err?.message || err };
   }
 }
-
